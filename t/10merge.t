@@ -100,6 +100,14 @@ push @tests, [
     [qw(< r | l > b < e | d > b       d b e)], # Algorithm::Diff::diff should fail (see BUG section of man page) on this one
 ];
 
+push @tests, [  # test conflict at end of sequences
+    [qw(a b c)],
+    [qw(a b d)],
+    [qw(a b e)],
+    [qw(a b < d | e >)],
+    [qw(a b < e | d >)],
+];
+
 
 
 plan tests => scalar(@tests) + scalar(grep { !UNIVERSAL::isa($_, 'CODE') } @tests);

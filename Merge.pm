@@ -7,9 +7,9 @@ use strict;
 
 use vars qw(@EXPORT_OK @ISA $VERSION $REVISION);
 
-$VERSION = '0.02';
+$VERSION = '0.03';
 
-$REVISION = (qw$Revision: 1.8 $)[-1];
+$REVISION = (qw$Revision: 1.9 $)[-1];
 
 @EXPORT_OK = qw(diff3 merge traverse_sequences3);
 
@@ -42,7 +42,7 @@ sub diff3 {
         elsif(@_ == 2) {
             push @ret, [ 'o', undef, $doca -> [$_[0]], $docb -> [$_[1]] ];
         }
-        else {
+        elsif(@_ == 3) {
             push @ret, [ 'o', $pivot -> [$_[0]], $doca -> [$_[1]], $docb -> [$_[2]] ];
         }
     };
@@ -54,7 +54,7 @@ sub diff3 {
         elsif(@_ == 2) {
             push @ret, [ 'l', $pivot -> [$_[0]], undef, $docb -> [$_[1]] ];
         }
-        else {
+        elsif(@_ == 3) {
             push @ret, [ 'l', $pivot -> [$_[0]], $doca -> [$_[1]], $docb -> [$_[2]] ];
         }
     };
@@ -66,7 +66,7 @@ sub diff3 {
         elsif(@_ == 2) {
             push @ret, [ 'r', $pivot -> [$_[0]], $doca -> [$_[0]], undef ];
         }
-        else {
+        elsif(@_ == 3) {
             push @ret, [ 'r', $pivot -> [$_[0]], $doca -> [$_[1]], $docb -> [$_[2]] ];
         }
     };
@@ -94,6 +94,7 @@ sub diff3 {
 use constant A => 4;
 use constant B => 2;
 use constant C => 1;
+use constant D => 8;  # should be an undef
 
 use constant AB_A => 32;
 use constant AB_B => 16;
@@ -236,7 +237,7 @@ sub traverse_sequences3 {
       [ $conflict,      A, B, C ], # 23 -      AB_B      AC_C BC_B BC_C
       [ $b_diff,           B    ], # 24 -      AB_B AC_A
       [ $noop,                  ], # 25 -      AB_B AC_A           BC_C
-      [ $noop,                  ], # 26 -      AB_B AC_A      BC_B
+      [ $c_diff,        D, B, C ], # 26 -      AB_B AC_A      BC_B
       [ $noop,                  ], # 27 -      AB_B AC_A      BC_B BC_C
       [ $noop,                  ], # 28 -      AB_B AC_A AC_C
       [ $noop,                  ], # 29 -      AB_B AC_A AC_C      BC_C
@@ -255,22 +256,23 @@ sub traverse_sequences3 {
       [ $a_diff,        A       ], # 42 - AB_A      AC_A      BC_B
       [ $noop,                  ], # 43 - AB_A      AC_A      BC_B BC_C
       [ $noop,                  ], # 44 - AB_A      AC_A AC_C
-      [ $noop,                  ], # 45 - AB_A      AC_A AC_C      BC_C
+      [ $c_diff,        A, D, C ], # 45 - AB_A      AC_A AC_C      BC_C
       [ $noop,                  ], # 46 - AB_A      AC_A AC_C BC_B
       [ $noop,                  ], # 47 - AB_A      AC_A AC_C BC_B BC_C
       [ $noop,                  ], # 48 - AB_A AB_B
       [ $b_diff,        A,    C ], # 49 - AB_A AB_B                BC_C
       [ $noop,                  ], # 50 - AB_A AB_B           BC_B
-      [ $a_diff,        A, B, C ], # 51 - AB_A AB_B           BC_B BC_C
+      #[ $a_diff,        A, B, C ], # 51 - AB_A AB_B           BC_B BC_C
+      [ $b_diff,        A, B, C ], # 51 - AB_A AB_B           BC_B BC_C
       [ $noop,                  ], # 52 - AB_A AB_B      AC_C
       [ $noop,                  ], # 53 - AB_A AB_B      AC_C      BC_C
       [ $noop,                  ], # 54 - AB_A AB_B      AC_C BC_B
       [ $noop,                  ], # 55 - AB_A AB_B      AC_C BC_B BC_C
       [ $noop,                  ], # 56 - AB_A AB_B AC_A
       [ $noop,                  ], # 57 - AB_A AB_B AC_A           BC_C
-      [ $noop,                  ], # 58 - AB_A AB_B AC_A      BC_B
+      [ $b_diff,        A, B, D ], # 58 - AB_A AB_B AC_A      BC_B
       [ $noop,                  ], # 59 - AB_A AB_B AC_A      BC_B BC_C
-      [ $noop,                  ], # 60 - AB_A AB_B AC_A AC_C
+      [ $a_diff,        A, B, C ], # 60 - AB_A AB_B AC_A AC_C
       [ $noop,                  ], # 61 - AB_A AB_B AC_A AC_C      BC_C
       [ $noop,                  ], # 62 - AB_A AB_B AC_A AC_C BC_B
       [ $conflict,      A, B, C ], # 63 - AB_A AB_B AC_A AC_C BC_B BC_C
@@ -322,23 +324,25 @@ sub traverse_sequences3 {
     my $switch;
     my @args;
 
-        while(grep { $pos[$_] < $sizes[$_] } (A, B, C)) {
-            $switch = 0;
-            @args = ();
-            foreach my $i (A, B, C) {
-                if($pos[$i] < $sizes[$i]) {
-                    $switch |= $i;
-                    push @args, $pos[$i]++;
-                }
+    while(grep { $pos[$_] < $sizes[$_] } (A, B, C)) {
+        $switch = 0;
+        @args = ();
+        foreach my $i (A, B, C) {
+            if($pos[$i] < $sizes[$i]) {
+                #warn "$i: $pos[$i] < $sizes[$i]\n";
+                $switch |= $i;
+                #warn "switch: $switch\n";
+                push @args, $pos[$i]++;
             }
+        }
 
-            my $match = $switch;
-            $switch = ( 0, 5, 24, 17, 34, 8, 10, 0 )[$switch];
+        my $match = $switch;
+        $switch = ( 0, 5, 24, 17, 34, 8, 10, 0 )[$switch];
         #warn "callback: $switch - \@pos: ", join(", ", @pos[A, B, C]), "\n";
         #warn "  match: $match\n";
-            &{$Callback_Map[$switch][0]}(@args)
-                if $Callback_Map[$switch];
-        }
+        &{$Callback_Map[$switch][0]}(@args)
+            if $Callback_Map[$switch];
+    }
 }
 
 sub merge {
@@ -390,6 +394,10 @@ sub merge {
             }
         }
         #print " : ", join(" ", @ret), " [$$h[1],$$h[2],$$h[3]]\n";
+    }
+
+    if(@{$conflict[0]} || @{$conflict[1]}) {
+        push @ret, &$conflictCallback(@conflict);
     }
 
     if(wantarray) {

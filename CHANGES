@@ -1,6 +1,19 @@
 Changes for Algorithm::Merge
 ----------------------------
 
+0.03  -  22 Apr 2003
+
+  Fixed some bugs in the traverse_sequences3, diff3, and merge routines.
+
+    merge: properly manage conflicts that remain after processing the 
+           diff3 results
+
+    traverse_sequences3: defined some more states in the Callback Map.
+
+    diff3: handle some sequence differences better
+
+  Thanks to Martin Hosken for bringing these to our attention.
+
 0.02  -  19 Feb 2003
 
   Change from Algorithm::Diff::diff to Algorithm::Diff::traverse_sequences.  
