@@ -50,6 +50,13 @@ push @tests, [
     [qw(a b   d e   g   i j k)]  # merge
 ];
 
+push @tests, [
+    [qw(a b c d e f g)], # ancestor
+    [qw(a b     e   g)], # left
+    [qw(a     d e   g)], # right
+    [qw(a       e   g)], # merge
+];
+
 # test conflicts
 push @tests, [
     [qw(a b c d)], # ancestor

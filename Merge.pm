@@ -7,9 +7,9 @@ use strict;
 
 use vars qw(@EXPORT_OK @ISA $VERSION $REVISION);
 
-$VERSION = '0.00_01';
+$VERSION = '0.00_02';
 
-$REVISION = (qw$Revision: 1.1 $)[-1];
+$REVISION = (qw$Revision: 1.2 $)[-1];
 
 @EXPORT_OK = qw(diff3 merge traverse_sequences3);
 
@@ -126,6 +126,9 @@ sub traverse_sequences3 {
     my $ac = Algorithm::Diff::diff( $adoc, $cdoc, $keyGen, @_);
     my $bc = Algorithm::Diff::diff( $bdoc, $cdoc, $keyGen, @_);
 
+    # e.g., if a position is in the AB_A array, then A has something 
+    # not in B at that position in A
+
     my %diffs = (
         AB_A , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$ab} ) ) ) ],
         AB_B , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$ab} ) ) ) ],
@@ -146,27 +149,30 @@ sub traverse_sequences3 {
 
     my $callback = 0;
 
-    my $noop = sub { 
-    };
+    my $noop = sub { };
+
+# Callback_Map is indexed by the sum of AB_A, AB_B, ..., as indicated by @matches
+# this isn't the most efficient, but it's a bit easier to maintain and 
+# read than if it were broken up into separate arrays
 
     my @Callback_Map = (
-      [ $no_change,     A, B, C ], # 0
-      [ $conflict,  undef, B, C ], # 1
-      [ $conflict,  A, B, undef ], # 2
-      [ $noop,                  ], # 3
-      [ $conflict,  A, B, undef ], # 4
-      [ $c_diff,              C ], # 5
-      [ $noop,                  ], # 6
-      [ $noop,                  ], # 7
-      [ $a_diff,    A           ], # 8
-      [ $noop,                  ], # 9
-      [ $c_diff,        A, B    ], # 10
-      [ $c_diff,        A, B,   ], # 11
-      [ $noop,                  ], # 12
-      [ $noop,                  ], # 13
-      [ $c_diff,        A, B,   ], # 14
-      [ $c_diff,        A, B, C ], # 15
-      [ $conflict,  A, B, undef ], # 16
+      [ $no_change,     A, B, C ], # 0  - no matches
+      [ $conflict,  undef, B, C ], # 1  - BC_C
+      [ $conflict,  A, B, undef ], # 2  - BC_B
+      [ $noop,                  ], # 3  - BC_B BC_C
+      [ $conflict,  A, B, undef ], # 4  - AC_C
+      [ $c_diff,              C ], # 5  - AC_C BC_C
+      [ $noop,                  ], # 6  - AC_C BC_B
+      [ $noop,                  ], # 7  - AC_C BC_B BC_C
+      [ $a_diff,    A           ], # 8  - AC_A
+      [ $noop,                  ], # 9  - AC_A BC_C
+      [ $c_diff,        A, B    ], # 10 - AC_A BC_B
+      [ $c_diff,        A, B,   ], # 11 - AC_A BC_B BC_C
+      [ $noop,                  ], # 12 - AC_A AC_C
+      [ $noop,                  ], # 13 - AC_A AC_C BC_C
+      [ $c_diff,        A, B,   ], # 14 - AC_A AC_C BC_B
+      [ $c_diff,        A, B, C ], # 15 - AC_A AC_C BC_B BC_C
+      [ $conflict,  A, B, undef ], # 16 - etc.
       [ $a_diff,           B, C ], # 17
       [ $b_diff,           B    ], # 18
       [ $c_diff,        A, B    ], # 19
@@ -192,7 +198,7 @@ sub traverse_sequences3 {
       [ $conflict,  A, undef, C ], # 39
       [ $a_diff,        A,      ], # 40
       [ $noop,                  ], # 41
-      [ $noop,                  ], # 42
+      [ $a_diff,        A       ], # 42
       [ $noop,                  ], # 43
       [ $c_diff,        A, B    ], # 44
       [ $noop,                  ], # 45
@@ -223,7 +229,7 @@ sub traverse_sequences3 {
           && (grep { $pos[$_] < $sizes[$_] } (A, B, C))) 
     {
 
-        @matches[AB_A, AB_B, AC_A, AC_C, BC_B, BC_C] = 0;
+        @matches[AB_A, AB_B, AC_A, AC_C, BC_B, BC_C] = undef;
 
         foreach my $i (A, B, C) {
             foreach my $j (A, B, C) {
@@ -233,41 +239,6 @@ sub traverse_sequences3 {
             }
         }
    
-#     32   16    8    4    2    1
-#    AB_A AB_B AC_A AC_C BC_B BC_C
-#  0                               => no change [a|b|c]
-#  1                             x => conflict [|b|c]
-#  2                        x      => conflict [a|b|]
-#  4                   x           => conflict [a|b|]
-#  5                   x         x => c, no a or b [||c]  - c different (+)
-#  7                   x    x    x => 
-#  8              x                => conflict [a||c]
-# 10              x         x      => a=b, no c [a|a|]    - c different (-)
-# 11              x         x    x =>  (14, b<->a) [|b|c] - a different (0)
-# 14              x    x    x      => no b, a==c? [a||c]  - b different (0)
-# 15              x    x    x    x => a=b, a!=c b!=c [a|a|c] - c different (.)
-# 16         x                     => conflict [a|b|]
-# 17         x                   x => b=c, no a [|b|b]   - a different (-)
-# 18         x              x      => b, no a or c [|b|] - b different
-# 19         x              x    x => b==a, no c [a|a|] - c different (0)
-# 20         x         x           => no a, b==c [|b|b] - a different (0)
-# 24         x    x                => b, no a or c [|b|] - b different (+)
-# 29         x    x    x         x => c!=b, no a [|b|c]  - conflict
-# 33    x                        x => 20 (a<->b) no b, a==c, [a||a] - b different (0)
-# 34    x                   x      => a, no b or c [a||] - a different (+)
-# 35    x                   x    x => a==c, no b [a||a] - b different (0)
-# 36    x              x           => a=c, no b [a||a]  - b different (-)
-# 39    x              x    x    x => a!=c, no b [a||c] - conflict
-# 40    x         x                => a different, no b or c
-# 44    x         x    x           =>  (14, b<->c)
-# 48    x    x                     => a!=b, no c [a|b]  - conflict (?)
-# 49    x    x                   x => a==c, no b [a||a] - b different (0)
-# 52    x    x         x           => b==c, no a [|b|b] - a different (0)
-# 51    x    x              x    x => b=c, a!=b a!=c [a|b|b] - a different (.)
-# 58    x    x    x         x      => a!=b, no c [a|b|]   - conflict
-# 60    x    x    x    x           => a=c, a!=b b!=c [a|b|a] - b different (.)
-# 63    x    x    x    x    x    x => conflict [a|b|c]   - conflict
-
         $callback = 0;
         $callback |= $_ foreach grep { $matches[$_] } ( AB_A, AB_B, AC_A, AC_C, BC_B, BC_C );
 
@@ -305,14 +276,7 @@ sub traverse_sequences3 {
                     push @args, $pos[$i]++;
                 }
             }
-#-
-#C        5
-#B       24
-#B C     17
-#A        8
-#A C     36
-#A B     10
-#A B C   0
+
             my $match = $switch;
             $switch = ( 0, 5, 24, 17, 34, 8, 10, 0 )[$switch];
         #warn "callback: $switch - \@pos: ", join(", ", @pos[A, B, C]), "\n";
@@ -323,10 +287,9 @@ sub traverse_sequences3 {
 }
 
 #print join(" ", merge(
-#    [qw(a         b c b f b d)],
-#    [qw(      r   b c b     d b e)],
-#    [qw(  l       b c b     d)],
-#    #[qw(< l | r > b c b     d b e)],
+#    [qw(a b c d e f g)], # ancestor
+#    [qw(a     d e   g h)], # right
+#    [qw(a b     e   g)], # left
 #    {
 #        CONFLICT => sub ($$) { (
 #            q{<}, @{$_[0]}, q{|}, @{$_[1]}, q{>}
@@ -334,8 +297,7 @@ sub traverse_sequences3 {
 #    },
 #)), "\n";
 #print join(" ", @{
-#    [qw(< r | l > b c b     d b e)],
-#    #[qw(< l | r > b c b     d b e)],
+#    [qw(a       e   g h)], # merge
 #  }), "\n";
 
 # a b < c d e h i | e f g i > j k
@@ -351,8 +313,6 @@ sub traverse_sequences3 {
 #foreach my $h (@{$diff}) {
 #    print $h -> [0], " [ ", join(" | ", @{$h}[1 .. 3]), "]\n";
 #}
-
-
 
 sub merge {
     my $pivot             = shift;                                  # array ref
@@ -379,7 +339,7 @@ sub merge {
 
     foreach my $h (@{$diff}) {
         my $i = 0;
-#        print "op: ", $h -> [0];
+        #print "op: ", $h -> [0];
         if($h -> [0] eq 'c') { # conflict
             push @{$conflict[0]}, $h -> [2] if defined $h -> [2];
             push @{$conflict[1]}, $h -> [3] if defined $h -> [3];
@@ -403,7 +363,7 @@ sub merge {
                 push @ret, $h -> [3] if defined $h -> [3];
             }
         }
-#        print " : ", join(" ", @ret), " [$$h[1],$$h[2],$$h[3]]\n";
+        #print " : ", join(" ", @ret), " [$$h[1],$$h[2],$$h[3]]\n";
     }
 
     if(wantarray) {
@@ -424,13 +384,21 @@ Algorithm::Merge - Three-way merge and diff
 
  use Algorithm::Merge qw(merge diff3);
 
- @merged = merge(\@ancestor, \@a, \@b);
+ @merged = merge(\@ancestor, \@a, \@b, { 
+               CONFLICT => sub { } 
+           });
 
- @merged = merge(\@ancestor, \@a, \@b, $key_generation_function);
+ @merged = merge(\@ancestor, \@a, \@b, { 
+               CONFLICT => sub { } 
+           }, $key_generation_function);
 
- $merged = merge(\@ancestor, \@a, \@b);
+ $merged = merge(\@ancestor, \@a, \@b, { 
+               CONFLICT => sub { } 
+           });
 
- $merged = merge(\@ancestor, \@a, \@b, $key_generation_function);
+ $merged = merge(\@ancestor, \@a, \@b, { 
+               CONFLICT => sub { } 
+           }, $key_generation_function);
 
  @diff   = diff3(\@ancestor, \@a, \@b);
 
@@ -439,6 +407,23 @@ Algorithm::Merge - Three-way merge and diff
  $diff   = diff3(\@ancestor, \@a, \@b);
 
  $diff   = diff3(\@ancestor, \@a, \@b, $key_generation_function);
+
+ @trav   = traverse_sequences3(\@ancestor, \@a, \@b, { 
+               # callbacks
+           });
+
+ @trav   = traverse_sequences3(\@ancestor, \@a, \@b, { 
+               # callbacks
+           }, $key_generation_function);
+
+ $trav   = traverse_sequences3(\@ancestor, \@a, \@b, { 
+               # callbacks
+           });
+
+ $trav   = traverse_sequences3(\@ancestor, \@a, \@b, { 
+               # callbacks
+           }, $key_generation_function);
+
 
 =head1 USAGE
 
@@ -517,6 +502,81 @@ The default C<CONFLICT> callback returns the following:
  q{<!-- ---------------------------- -->},
  (@right),
  q{<!-- ------  END  CONFLICT ------ -->},
+
+=head2 traverse_sequences3
+
+This is the workhorse function that goes through the three sequences 
+and calls the callback functions.
+
+The following callbacks are supported.
+
+=over 4
+
+=item NO_CHANGE
+
+This is called if all three sequences have the same element at the 
+current position.  The arguments are the current positions within each 
+sequence, the first argument being the current position within the 
+first sequence.
+
+=item A_DIFF
+
+This is called if the first sequence is different than the other two 
+sequences at the current position.
+This callback will be called with one, two, or three arguments.
+
+If one argument, then only the element at the given position from the 
+first sequence is not in either of the other two sequences.
+
+If two arguments, then there is no element in the first sequence that 
+corresponds to the elements at the given positions in the second and 
+third sequences.
+
+If three arguments, then the element at the given position in the first 
+sequence is different than the corresponding element in the other two 
+sequences, but the other two sequences have corresponding elements.
+
+=item B_DIFF
+
+This is called if the second sequence is different than the other two 
+sequences at the current position.
+This callback will be called with one, two, or three arguments.   
+
+If one argument, then only the element at the given position from the 
+second sequence is not in either of the other two sequences.
+
+If two arguments, then there is no element in the second sequence that 
+corresponds to the elements at the given positions in the first and 
+third sequences.
+
+If three arguments, then the element at the given position in the second 
+sequence is different than the corresponding element in the other two 
+sequences, but the other two sequences have corresponding elements.
+
+=item C_DIFF
+
+This is called if the third sequence is different than the other two 
+sequences at the current position.
+This callback will be called with one, two, or three arguments.   
+
+If one argument, then only the element at the given position from the 
+third sequence is not in either of the other two sequences.
+
+If two arguments, then there is no element in the third sequence that 
+corresponds to the elements at the given positions in the first and 
+second sequences.
+
+If three arguments, then the element at the given position in the third 
+sequence is different than the corresponding element in the other two 
+sequences, but the other two sequences have corresponding elements.
+
+=item CONFLICT
+
+This is called if all three sequences have different elements at the 
+current position.  The three arguments are the current positions within 
+each sequence.
+
+=back 4
 
 =head1 BUGS
 
