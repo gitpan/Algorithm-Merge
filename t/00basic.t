@@ -1,14 +1,6 @@
-use Test;
+use Test::More tests => 3;
 
-use Algorithm::Merge qw(diff3 merge);
-use Algorithm::Diff qw(diff);
-use Data::Dumper;
-
-plan tests => 3;
-
-eval { require Algorithm::Merge; };
-
-ok !$@;
+require_ok('Algorithm::Merge');
 
 eval { Algorithm::Merge -> import('diff3'); };
 

@@ -1,9 +1,10 @@
-use Test;
-use Algorithm::Merge qw(diff3 merge);
-use Algorithm::Diff qw(diff);
-use Data::Dumper;
+# `use' statements are after test definition
 
 my $error_message = 'Algorithm::Diff::diff is not symmetric for second and third sequences';
+
+my(@tests, $tests);
+
+BEGIN {
 
 # test deletion of last member in ancestor
 push @tests, [
@@ -108,9 +109,32 @@ push @tests, [  # test conflict at end of sequences
     [qw(a b < e | d >)],
 ];
 
+push @tests, [
+    [qw(a b c   e f h   i   k)], # ancestor
+    [qw(a b   d e f g g i j k)], # left
+    [qw(a b c d e   h   i j k)], # right
+    [qw(a b   d e   g g i j k)]  # merge
+];
+
+push @tests, [
+    [qw(a b c d       h i j)], # ancestor
+    [qw(a b c d   f   h i j)], # left
+    [qw(a b c   e   g      )], # right
+    [qw(a b c   e f g      )], # merge
+];
 
 
-plan tests => scalar(@tests) + scalar(grep { !UNIVERSAL::isa($_, 'CODE') } @tests);
+
+$tests = scalar(@tests) + scalar(grep { !UNIVERSAL::isa($_, 'CODE') } @tests) + 1;
+
+#eval { require Algorithm::Diff };
+#$tests *= -1 if $@;
+
+}
+
+use Test::More tests => $tests;
+
+require_ok('Algorithm::Merge');
 
 my $out;
 
@@ -124,7 +148,7 @@ foreach my $t (@tests) {
         eval {
             local $SIG{__DIE__};
             local $SIG{__WARN__} = sub { };
-            $out = merge(@{$t}[0, 1, 2],     
+            $out = Algorithm::Merge::merge(@{$t}[0, 1, 2],     
                 {
                     CONFLICT => sub ($$) { (
                         q{<}, @{$_[0]}, q{|}, @{$_[1]}, q{>}
@@ -136,10 +160,12 @@ foreach my $t (@tests) {
             ok 1;
         }
         else {
-            my $diff = diff($out, $t -> [3]);
+            #my $diff = Algorithm::Diff::diff($out, $t -> [3]);
 
-            warn "qw(", join(" ", @{$out}), ") ne qw(", join(" ", @{$t -> [3]}), ")\n" if $ENV{DEBUG} && @{$diff};
-            ok !@{$diff}; # ok if there's no difference
+            #warn "qw(", join(" ", @{$out}), ") ne qw(", join(" ", @{$t -> [3]}), ")\n" if $ENV{DEBUG} && @{$diff};
+            #ok !@{$diff}; # ok if there's no difference
+            #main::diag("Expecting:\n" . join(" ", @{$t -> [3]}) . "\n" . join(" " , @{$out}));
+            is_deeply($out, $t -> [3]);
         }
     }
 }
@@ -150,7 +176,7 @@ foreach my $t (@tests) {
     eval {
         local $SIG{__DIE__};
         local $SIG{__WARN__} = sub { };
-        $out = merge(@{$t}[0, 2, 1],
+        $out = Algorithm::Merge::merge(@{$t}[0, 2, 1],
             {
                 CONFLICT => sub ($$) { (
                     q{<}, @{$_[0]}, q{|}, @{$_[1]}, q{>}
@@ -163,10 +189,11 @@ foreach my $t (@tests) {
         ok 1;
     }
     else {
-        my $diff = diff($out, $t -> [4] || $t -> [3]);
+        #my $diff = Algorithm::Diff::diff($out, $t -> [4] || $t -> [3]);
 
-        warn "qw(", join(" ", @{$out}), ") ne qw(", join(" ", @{$t -> [4] || $t -> [3]}), ")\n" if $ENV{DEBUG} && @{$diff};
-        ok !@{$diff}; # ok if there's no difference
+        #warn "qw(", join(" ", @{$out}), ") ne qw(", join(" ", @{$t -> [4] || $t -> [3]}), ")\n" if $ENV{DEBUG} && @{$diff};
+        #ok !@{$diff}; # ok if there's no difference
+        is_deeply($out, $t -> [4] || $t -> [3]);
     }
 }
 

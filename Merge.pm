@@ -7,9 +7,9 @@ use strict;
 
 use vars qw(@EXPORT_OK @ISA $VERSION $REVISION);
 
-$VERSION = '0.03';
+$VERSION = '0.04';
 
-$REVISION = (qw$Revision: 1.9 $)[-1];
+$REVISION = (qw$Revision: 1.10 $)[-1];
 
 @EXPORT_OK = qw(diff3 merge traverse_sequences3);
 
@@ -23,9 +23,30 @@ sub diff3 {
 
     my @ret;
 
-    my $no_change = sub {
-        push @ret, [ 'u', $pivot -> [$_[0]], $doca -> [$_[1]], $docb -> [$_[2]] ];
-    };
+    my $no_change;
+
+#    if($keyGen) {
+#        $no_change = sub {
+#            if($keyGen->($pivot -> [$_[0]]) ne $keyGen->($doca -> [$_[1]])
+#               || $keyGen->($pivot -> [$_[0]]) ne $keyGen->($docb -> [$_[2]])
+#               || $keyGen->($doca -> [$_[1]]) ne $keyGen->($docb -> [$_[2]]))
+#            {
+#               croak "No change detected, but elements differ between sequences.  Please submit a bug report to jsmith\@cpan.org with a description of the set of sequences which lead to this error.\n";
+#            }
+#            push @ret, [ 'u', $pivot -> [$_[0]], $doca -> [$_[1]], $docb -> [$_[2]] ];
+#        };
+#    }
+#    else {
+        $no_change = sub {
+#            if($pivot -> [$_[0]] ne $doca -> [$_[1]]
+#               || $pivot -> [$_[0]] ne $docb -> [$_[2]]
+#               || $doca -> [$_[1]] ne $docb -> [$_[2]])
+#            {
+#               croak "No change detected, but elements differ between sequences.  Please submit a bug report to jsmith\@cpan.org with a description of the set of sequences which lead to this error.\n";
+#            }
+            push @ret, [ 'u', $pivot -> [$_[0]], $doca -> [$_[1]], $docb -> [$_[2]] ];
+        };
+#    }
 
     my $conflict = sub {
         my($a, $b, $c);
@@ -206,8 +227,8 @@ sub traverse_sequences3 {
 # Callback_Map is indexed by the sum of AB_A, AB_B, ..., as indicated by @matches
 # this isn't the most efficient, but it's a bit easier to maintain and 
 # read than if it were broken up into separate arrays
-# more than half the entries are not $noop - it would see then that no 
-# entries should be $noop.  I need patters to figure out what the 
+# more than half the entries are not $noop - it would seem then that no 
+# entries should be $noop.  I need patterns to figure out what the 
 # other entries are.
 
     my @Callback_Map = (
@@ -229,7 +250,7 @@ sub traverse_sequences3 {
       [ $c_diff,        A, B, C ], # 15 -           AC_A AC_C BC_B BC_C
       [ $noop,                  ], # 16 -      AB_B
       [ $noop,                  ], # 17 -      AB_B                BC_C
-      [ $noop,                  ], # 18 -      AB_B           BC_B
+      [ $b_diff,           B    ], # 18 -      AB_B           BC_B
       [ $noop,                  ], # 19 -      AB_B           BC_B BC_C
       [ $a_diff,           B, C ], # 20 -      AB_B      AC_C
       [ $noop,                  ], # 21 -      AB_B      AC_C      BC_C
@@ -239,10 +260,10 @@ sub traverse_sequences3 {
       [ $noop,                  ], # 25 -      AB_B AC_A           BC_C
       [ $c_diff,        D, B, C ], # 26 -      AB_B AC_A      BC_B
       [ $noop,                  ], # 27 -      AB_B AC_A      BC_B BC_C
-      [ $noop,                  ], # 28 -      AB_B AC_A AC_C
+      [ $a_diff,           B, C ], # 28 -      AB_B AC_A AC_C
       [ $noop,                  ], # 29 -      AB_B AC_A AC_C      BC_C
       [ $noop,                  ], # 30 -      AB_B AC_A AC_C BC_B
-      [ $noop,                  ], # 31 -      AB_B AC_A AC_C BC_B BC_C
+      [ $b_diff,           B    ], # 31 -      AB_B AC_A AC_C BC_B BC_C
       [ $no_change,     A, B, C ], # 32 - AB_A
       [ $b_diff,        A,    C ], # 33 - AB_A                     BC_C
       [ $noop,                  ], # 34 - AB_A                BC_B
@@ -253,6 +274,7 @@ sub traverse_sequences3 {
       [ $noop,                  ], # 39 - AB_A           AC_C BC_B BC_C
       [ $a_diff,        A,      ], # 40 - AB_A      AC_A
       [ $noop,                  ], # 41 - AB_A      AC_A           BC_C
+      #[ $no_change,     A, B, C ], # 41 - AB_A      AC_A           BC_C
       [ $a_diff,        A       ], # 42 - AB_A      AC_A      BC_B
       [ $noop,                  ], # 43 - AB_A      AC_A      BC_B BC_C
       [ $noop,                  ], # 44 - AB_A      AC_A AC_C
@@ -264,11 +286,11 @@ sub traverse_sequences3 {
       [ $noop,                  ], # 50 - AB_A AB_B           BC_B
       #[ $a_diff,        A, B, C ], # 51 - AB_A AB_B           BC_B BC_C
       [ $b_diff,        A, B, C ], # 51 - AB_A AB_B           BC_B BC_C
-      [ $noop,                  ], # 52 - AB_A AB_B      AC_C
+      [ $a_diff,           B, C ], # 52 - AB_A AB_B      AC_C
       [ $noop,                  ], # 53 - AB_A AB_B      AC_C      BC_C
       [ $noop,                  ], # 54 - AB_A AB_B      AC_C BC_B
-      [ $noop,                  ], # 55 - AB_A AB_B      AC_C BC_B BC_C
-      [ $noop,                  ], # 56 - AB_A AB_B AC_A
+      [ $c_diff,              C ], # 55 - AB_A AB_B      AC_C BC_B BC_C
+      [ $b_diff,        A,    C ], # 56 - AB_A AB_B AC_A
       [ $noop,                  ], # 57 - AB_A AB_B AC_A           BC_C
       [ $b_diff,        A, B, D ], # 58 - AB_A AB_B AC_A      BC_B
       [ $noop,                  ], # 59 - AB_A AB_B AC_A      BC_B BC_C
@@ -299,11 +321,14 @@ sub traverse_sequences3 {
         $callback |= $_ foreach grep { $matches[$_] } ( AB_A, AB_B, AC_A, AC_C, BC_B, BC_C );
 
         my @args = @{$Callback_Map[$callback]};
+        #main::diag(">>>>>>    We hit a noop") if @args == 1;
         my $f = shift @args;
-        #warn "callback: $callback - \@pos: ", join(", ", @pos[A, B, C]), "\n";
-        #warn "  matches: ", join(", ", @matches[AB_A, AB_B, AC_A, AC_C, BC_B, BC_C]), "\n";
-        #warn " diffs: ", join(", ", map { $diffs{$_}->[0] } (AB_A, AB_B, AC_A, AC_C, BC_B, BC_C)), "\n";
-        #warn "args: ", join(", ", map { (qw(- C B - A))[$_] } @args), "\n";
+        #main::diag(join "", "callback: $callback - \@pos: ", join(", ", @pos[A, B, C]), "\n");
+        #main::diag(">>>>>>    Callback is a no-op") unless @args;
+        #main::diag(join "", "  matches: ", join(", ", @matches[AB_A, AB_B, AC_A, AC_C, BC_B, BC_C]), "\n");
+        #main::diag(join "", " diffs: ", join(", ", map { $diffs{$_}->[0] } (AB_A, AB_B, AC_A, AC_C, BC_B, BC_C)), "\n");
+        #main::diag(join "", "args: ", join(", ", map { (qw(- C B - A))[$_] } @args), "(", join(", ", @pos[@args]), ")\n");
+        #main::diag('--------------------');
         &{$f}(@pos[@args]);
         foreach (@args) {
             $pos[$_]++;
@@ -338,8 +363,8 @@ sub traverse_sequences3 {
 
         my $match = $switch;
         $switch = ( 0, 5, 24, 17, 34, 8, 10, 0 )[$switch];
-        #warn "callback: $switch - \@pos: ", join(", ", @pos[A, B, C]), "\n";
-        #warn "  match: $match\n";
+        #main::diag(join"", "callback: $switch - \@pos: ", join(", ", @pos[A, B, C]));
+        #main::diag(join"", "  match: $match");
         &{$Callback_Map[$switch][0]}(@args)
             if $Callback_Map[$switch];
     }
@@ -406,10 +431,19 @@ sub merge {
     return \@ret;
 }
 
+
 #
 # For testing:
 #
+#sub main::diag {
+#    warn join("", @_) , "\n";
+#}
+#
 #print join(" ", merge(
+#    [qw(a b c d       h i j)], # ancestor
+#    [qw(a b c d   f   h i j)], # left
+#    [qw(a b c   e   g      )], # right
+#
 #    {
 #        CONFLICT => sub ($$) { (
 #            q{<}, @{$_[0]}, q{|}, @{$_[1]}, q{>}
@@ -417,6 +451,7 @@ sub merge {
 #    },
 #)), "\n";
 #print join(" ", @{
+#    [qw(a b c   e f g)], # merge
 #  }), "\n";
 
 
@@ -654,5 +689,5 @@ James G. Smith, <jsmith@cpan.org>
 
 Copyright (C) 2003  Texas A&M University.  All Rights Reserved.
 
-This module is free software; you can redistribute it and/or
+This module is free software; you may redistribute it and/or
 modify it under the same terms as Perl itself.

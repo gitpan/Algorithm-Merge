@@ -1,9 +1,10 @@
-use Test;
-use Algorithm::Merge qw(diff3);
-#use Algorithm::Diff qw(diff);
-use Data::Dumper;
+# `use' statements are after test definition
 
 my $error_message = 'Algorithm::Diff::diff is not symmetric for second and third sequences';
+
+my(@tests, $tests);
+
+BEGIN {
 
 # check sequences of equal length (1 element each)
 my @results = (
@@ -57,7 +58,13 @@ foreach $i (0, 1) {
     }
 }
 
-plan tests => scalar(@tests);
+$tests = scalar(@tests) + 1;
+
+} # END BEGIN
+
+use Test::More tests => $tests;
+
+require_ok('Algorithm::Merge');
 
 my $out;
 
@@ -71,17 +78,18 @@ foreach my $t (@tests) {
         eval {
             local $SIG{__DIE__};
             local $SIG{__WARN__} = sub { };
-            $out = diff3(@{$t}[0, 1, 2]);
+            $out = Algorithm::Merge::diff3(@{$t}[0, 1, 2]);
         };
         if($@ && $@ =~ m{^$error_message}o) {
             ok 1;
         }
         else {
-            my $sout = join(";", map { join(":", map { defined($_) ? "[$_]" : "" } @{$_}) } @{$out});
-            my $sexp = join(";", map { join(":", map { defined($_) ? "[$_]" : "" } @{$_}) } @{$t->[3]});
+            #my $sout = join(";", map { join(":", map { defined($_) ? "[$_]" : "" } @{$_}) } @{$out});
+            #my $sexp = join(";", map { join(":", map { defined($_) ? "[$_]" : "" } @{$_}) } @{$t->[3]});
 
-            warn Data::Dumper -> Dump([$out, $t->[3]], [qw(Out Expected Diff)]) if $ENV{DEBUG} && $sout ne $sexp;
-            ok $sout eq $sexp;
+            #warn Data::Dumper -> Dump([$out, $t->[3]], [qw(Out Expected Diff)]) if $ENV{DEBUG} && $sout ne $sexp;
+            #ok $sout eq $sexp;
+            is_deeply($out, $t->[3]);
         }
     }
 }
