@@ -3,6 +3,8 @@ use Algorithm::Merge qw(diff3 merge);
 use Algorithm::Diff qw(diff);
 use Data::Dumper;
 
+my $error_message = 'Algorithm::Diff::diff is not symmetric for second and third sequences';
+
 # test deletion of last member in ancestor
 push @tests, [
     [qw(a b c)], # ancestor
@@ -74,46 +76,82 @@ push @tests, [
     [qw(< r | l > b c b     d b e)],
 ];
 
+push @tests, [
+    [qw(a b             b c b f b d)],
+    [qw(    l m         b c b     d)],
+    [qw(          r s   b c b     d b e)],
+    [qw(  < l m | r s > b c b     d b e)],
+    [qw(  < r s | l m > b c b     d b e)],
+];
+
+push @tests, [
+    [qw(a         b c         b f b d)],
+    [qw(  l       b   d       b     d)],
+    [qw(      r   b       e   b     d b e)],
+    [qw(< l | r > b < d | e > b     d b e)],
+    [qw(< r | l > b < e | d > b     d b e)], # Algorithm::Diff::diff should fail (see BUG section of man page) on this one
+];
+
+
 
 plan tests => scalar(@tests) + scalar(grep { !UNIVERSAL::isa($_, 'CODE') } @tests);
 
+my $out;
+
 foreach my $t (@tests) {
     if(UNIVERSAL::isa($t, 'CODE')) {
-        eval { $t -> (); };
+        eval { local $SIG{__DIE__}; $t -> (); };
         warn "$@\n" if $@ && $ENV{DEBUG};
         ok !$@;
     }
     else {
-        my $out = merge(@{$t}[0, 1, 2],     
-            {
-                CONFLICT => sub ($$) { (
-                    q{<}, @{$_[0]}, q{|}, @{$_[1]}, q{>}
-                ) },
-            },
-        );
+        eval {
+            local $SIG{__DIE__};
+            local $SIG{__WARN__} = sub { };
+            $out = merge(@{$t}[0, 1, 2],     
+                {
+                    CONFLICT => sub ($$) { (
+                        q{<}, @{$_[0]}, q{|}, @{$_[1]}, q{>}
+                    ) },
+                },
+            );
+        };
+        if($@ && $@ =~ m{^$error_message}o) {
+            ok 1;
+        }
+        else {
+            my $diff = diff($out, $t -> [3]);
 
-        my $diff = diff($out, $t -> [3]);
-
-        warn "qw(", join(" ", @{$out}), ") ne qw(", join(" ", @{$t -> [3]}), ")\n" if $ENV{DEBUG} && @{$diff};
-        ok !@{$diff}; # ok if there's no difference
+            warn "qw(", join(" ", @{$out}), ") ne qw(", join(" ", @{$t -> [3]}), ")\n" if $ENV{DEBUG} && @{$diff};
+            ok !@{$diff}; # ok if there's no difference
+        }
     }
 }
 
 # make sure the merge is symmetric
 foreach my $t (@tests) {
     next if UNIVERSAL::isa($t, 'CODE');
-    my $out = merge(@{$t}[0, 2, 1],
-        {
-            CONFLICT => sub ($$) { (
-                q{<}, @{$_[0]}, q{|}, @{$_[1]}, q{>}
-            ) },
-        },
-    );
+    eval {
+        local $SIG{__DIE__};
+        local $SIG{__WARN__} = sub { };
+        $out = merge(@{$t}[0, 2, 1],
+            {
+                CONFLICT => sub ($$) { (
+                    q{<}, @{$_[0]}, q{|}, @{$_[1]}, q{>}
+                ) },
+            },
+        );
+    };
 
-    my $diff = diff($out, $t -> [4] || $t -> [3]);
+    if($@ && $@ =~ m{^$error_message}o) {
+        ok 1;
+    }
+    else {
+        my $diff = diff($out, $t -> [4] || $t -> [3]);
 
-    warn "qw(", join(" ", @{$out}), ") ne qw(", join(" ", @{$t -> [4] || $t -> [3]}), ")\n" if $ENV{DEBUG} && @{$diff};
-    ok !@{$diff}; # ok if there's no difference
+        warn "qw(", join(" ", @{$out}), ") ne qw(", join(" ", @{$t -> [4] || $t -> [3]}), ")\n" if $ENV{DEBUG} && @{$diff};
+        ok !@{$diff}; # ok if there's no difference
+    }
 }
 
 

@@ -7,9 +7,9 @@ use strict;
 
 use vars qw(@EXPORT_OK @ISA $VERSION $REVISION);
 
-$VERSION = '0.00_02';
+$VERSION = '0.00_03';
 
-$REVISION = (qw$Revision: 1.2 $)[-1];
+$REVISION = (qw$Revision: 1.4 $)[-1];
 
 @EXPORT_OK = qw(diff3 merge traverse_sequences3);
 
@@ -101,6 +101,8 @@ use constant AC_A =>  8;
 use constant AC_C =>  4;
 use constant BC_B =>  2;
 use constant BC_C =>  1;
+use constant CB_C =>  3;  # not used in calculations
+use constant CB_B =>  5;  # not used in calculations
 
 my @abc_s;
 $abc_s[(A|B)*8+A] = AB_A;
@@ -126,8 +128,12 @@ sub traverse_sequences3 {
     my $ac = Algorithm::Diff::diff( $adoc, $cdoc, $keyGen, @_);
     my $bc = Algorithm::Diff::diff( $bdoc, $cdoc, $keyGen, @_);
 
+    my $cb = Algorithm::Diff::diff( $cdoc, $bdoc, $keyGen, @_);
+
     # e.g., if a position is in the AB_A array, then A has something 
     # not in B at that position in A
+
+    #print Data::Dumper -> Dump([$bc]);
 
     my %diffs = (
         AB_A , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$ab} ) ) ) ],
@@ -136,7 +142,32 @@ sub traverse_sequences3 {
         AC_C , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$ac} ) ) ) ],
         BC_B , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$bc} ) ) ) ],
         BC_C , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$bc} ) ) ) ],
+        CB_C , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$cb} ) ) ) ],
+        CB_B , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$cb} ) ) ) ],
     );
+
+    if(join(",", @{$diffs{&CB_B}}) ne join(",", @{$diffs{&BC_B}}) ||
+       join(",", @{$diffs{&CB_C}}) ne join(",", @{$diffs{&BC_C}}))
+    {
+        carp "Algorithm::Diff::diff is not symmetric for second and third sequences - results might not be correct";
+
+        # merge sequences
+        #BC_B + CB_B => BC_B
+        #BC_B + CB_C => BC_C
+        my $bcb_diffs = Algorithm::Diff::diff( $diffs{&CB_B}, $diffs{&BC_B} );
+        my $bcc_diffs = Algorithm::Diff::diff( $diffs{&CB_C}, $diffs{&BC_C} );
+        # we should have pairs of [ [ -, ... ] , [ +, ... ] ]
+        # we want ... - ... to be added to the BC_{B,C} sequences
+        #warn Data::Dumper -> Dump([$bcb_diffs, $bcc_diffs], [qw(bcb bcc)]);
+        foreach my $h (@{$bcb_diffs}) {
+            my($a, $b) = ($h->[0]->[2], $h->[1]->[2]);
+            splice @{$diffs{&BC_B}}, $h->[0]->[1], 1, ($a);
+        }
+        foreach my $h (@{$bcc_diffs}) {
+            my($a, $b) = ($h->[0]->[2], $h->[1]->[2]);
+            splice @{$diffs{&BC_C}}, $h->[0]->[1], 1, ($b);
+        }
+    }
 
     my @pos;
     @pos[A, B, C] = (0, 0, 0);
@@ -154,12 +185,15 @@ sub traverse_sequences3 {
 # Callback_Map is indexed by the sum of AB_A, AB_B, ..., as indicated by @matches
 # this isn't the most efficient, but it's a bit easier to maintain and 
 # read than if it were broken up into separate arrays
+# more than half the entries are not $noop - it would see then that no 
+# entries should be $noop.  I need patters to figure out what the 
+# other entries are.
 
     my @Callback_Map = (
       [ $no_change,     A, B, C ], # 0  - no matches
-      [ $conflict,  undef, B, C ], # 1  - BC_C
+      [ $noop,                  ], # 1  - BC_C
       [ $conflict,  A, B, undef ], # 2  - BC_B
-      [ $noop,                  ], # 3  - BC_B BC_C
+      [ $no_change, A, B, C     ], # 3  - BC_B BC_C
       [ $conflict,  A, B, undef ], # 4  - AC_C
       [ $c_diff,              C ], # 5  - AC_C BC_C
       [ $noop,                  ], # 6  - AC_C BC_B
@@ -172,15 +206,15 @@ sub traverse_sequences3 {
       [ $noop,                  ], # 13 - AC_A AC_C BC_C
       [ $c_diff,        A, B,   ], # 14 - AC_A AC_C BC_B
       [ $c_diff,        A, B, C ], # 15 - AC_A AC_C BC_B BC_C
-      [ $conflict,  A, B, undef ], # 16 - etc.
+      [ $b_diff,           B    ], # 16
       [ $a_diff,           B, C ], # 17
       [ $b_diff,           B    ], # 18
       [ $c_diff,        A, B    ], # 19
       [ $a_diff,           B, C ], # 20
       [ $noop,                  ], # 21
       [ $noop,                  ], # 22
-      [ $noop,                  ], # 23
-      [ $b_diff,           B    ], # 24
+      [ $conflict,      A, B, C ], # 23 
+      [ $b_diff,           B    ], # 24 
       [ $noop,                  ], # 25
       [ $noop,                  ], # 26
       [ $noop,                  ], # 27
@@ -197,11 +231,11 @@ sub traverse_sequences3 {
       [ $noop,                  ], # 38
       [ $conflict,  A, undef, C ], # 39
       [ $a_diff,        A,      ], # 40
-      [ $noop,                  ], # 41
+      [ $a_diff,        A       ], # 41
       [ $a_diff,        A       ], # 42
-      [ $noop,                  ], # 43
+      [ $a_diff,        A       ], # 43
       [ $c_diff,        A, B    ], # 44
-      [ $noop,                  ], # 45
+      [ $conflict,      A, B, C ], # 45
       [ $noop,                  ], # 46
       [ $noop,                  ], # 47
       [ $conflict,  A, B, undef ], # 48
@@ -214,11 +248,11 @@ sub traverse_sequences3 {
       [ $noop,                  ], # 55
       [ $noop,                  ], # 56
       [ $noop,                  ], # 57
-      [ $conflict,  A, B, undef ], # 58
+      [ $conflict,      A, B, C ], # 58
       [ $noop,                  ], # 59
       [ $b_diff,        A, B, C ], # 60
-      [ $noop,                  ], # 61
-      [ $noop,                  ], # 62
+      [ $conflict,      A, B, C ], # 61
+      [ $conflict,      A, B, C ], # 62
       [ $conflict,      A, B, C ], # 63
     );
 
@@ -246,6 +280,7 @@ sub traverse_sequences3 {
         my $f = shift @args;
         #warn "callback: $callback - \@pos: ", join(", ", @pos[A, B, C]), "\n";
         #warn "  matches: ", join(", ", @matches[AB_A, AB_B, AC_A, AC_C, BC_B, BC_C]), "\n";
+        #warn " diffs: ", join(", ", map { $diffs{$_}->[0] } (AB_A, AB_B, AC_A, AC_C, BC_B, BC_C)), "\n";
         #warn "args: ", join(", ", map { (qw(- C B - A))[$_] } @args), "\n";
         &{$f}(@pos[@args]);
         foreach (@args) {
@@ -286,34 +321,6 @@ sub traverse_sequences3 {
         }
 }
 
-#print join(" ", merge(
-#    [qw(a b c d e f g)], # ancestor
-#    [qw(a     d e   g h)], # right
-#    [qw(a b     e   g)], # left
-#    {
-#        CONFLICT => sub ($$) { (
-#            q{<}, @{$_[0]}, q{|}, @{$_[1]}, q{>}
-#        ) },
-#    },
-#)), "\n";
-#print join(" ", @{
-#    [qw(a       e   g h)], # merge
-#  }), "\n";
-
-# a b < c d e h i | e f g i > j k
-# a b d e h < | g > i j k
-
-#my $diff = diff3(
-#traverse_sequences3(
-# [qw(a b c   e f   h i   k)],
-## [qw(a b   d e f g   i j k)],
-# [qw(a b c d e     h i j k)],
-#);
-
-#foreach my $h (@{$diff}) {
-#    print $h -> [0], " [ ", join(" | ", @{$h}[1 .. 3]), "]\n";
-#}
-
 sub merge {
     my $pivot             = shift;                                  # array ref
     my $doca              = shift;                                  # array ref
@@ -339,11 +346,10 @@ sub merge {
 
     foreach my $h (@{$diff}) {
         my $i = 0;
-        #print "op: ", $h -> [0];
+#        print "op: ", $h -> [0];
         if($h -> [0] eq 'c') { # conflict
             push @{$conflict[0]}, $h -> [2] if defined $h -> [2];
             push @{$conflict[1]}, $h -> [3] if defined $h -> [3];
-            #push @ret, &$conflictCallback($h -> [2], $h -> [3]);
         }
         else {
             if(@{$conflict[0]} || @{$conflict[1]}) {
@@ -363,7 +369,7 @@ sub merge {
                 push @ret, $h -> [3] if defined $h -> [3];
             }
         }
-        #print " : ", join(" ", @ret), " [$$h[1],$$h[2],$$h[3]]\n";
+#        print " : ", join(" ", @ret), " [$$h[1],$$h[2],$$h[3]]\n";
     }
 
     if(wantarray) {
@@ -371,6 +377,20 @@ sub merge {
     }
     return \@ret;
 }
+
+#
+# For testing:
+#
+#print join(" ", merge(
+#    {
+#        CONFLICT => sub ($$) { (
+#            q{<}, @{$_[0]}, q{|}, @{$_[1]}, q{>}
+#        ) },
+#    },
+#)), "\n";
+#print join(" ", @{
+#  }), "\n";
+
 
 1;
 
@@ -583,6 +603,14 @@ each sequence.
 Most assuredly there are bugs.  If a pattern similar to the above 
 example does not work, send it to <jsmith@cpan.org> or report it on 
 <http://rt.cpan.org/>, the CPAN bug tracker.
+
+L<Algorithm::Diff|Algorithm::Diff>'s implementation of C<diff> is not 
+symmetric with respect to the input sequences.  Because of this, 
+C<traverse_sequences3> will calculate the diffs of the second and third 
+sequences as passed and swapped.  If the differences are not the same, 
+it will issue an `Algorithm::Diff::diff is not symmetric for second 
+and third sequences...' warning.  It will try to handle this, but there 
+may be some cases where it can't.
 
 =head1 SEE ALSO
 
