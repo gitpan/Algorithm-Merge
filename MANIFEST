@@ -1,0 +1,6 @@
+MANIFEST
+Makefile.PL
+Merge.pm
+README
+t/00basic.t
+t/10merge.t

@@ -1,0 +1,115 @@
+NAME
+    Algorithm::Merge - Three-way merge and diff
+
+SYNOPSIS
+     use Algorithm::Merge qw(merge diff3);
+
+     @merged = merge(\@ancestor, \@a, \@b);
+
+     @merged = merge(\@ancestor, \@a, \@b, $key_generation_function);
+
+     $merged = merge(\@ancestor, \@a, \@b);
+
+     $merged = merge(\@ancestor, \@a, \@b, $key_generation_function);
+
+     @diff   = diff3(\@ancestor, \@a, \@b);
+
+     @diff   = diff3(\@ancestor, \@a, \@b, $key_generation_function);
+
+     $diff   = diff3(\@ancestor, \@a, \@b);
+
+     $diff   = diff3(\@ancestor, \@a, \@b, $key_generation_function);
+
+USAGE
+    This module complements Algorithm::Diff by providing three-way merge and
+    diff functions.
+
+    In this documentation, the first list to "diff3" and "merge" is called
+    the `original' list. The second list is the `left' list. The third list
+    is the `right' list.
+
+    The optional key generation arguments are the same as in
+    Algorithm::Diff. See the Algorithm::Diff manpage for more information.
+
+  diff3
+
+    Given references to three lists of items, "diff3" performs a three-way
+    difference.
+
+    This function returns an array of operations describing how the left and
+    right lists differ from the original list. In scalar context, this
+    function returns a reference to such an array.
+
+    Perhaps an example would be useful.
+
+    Given the following three lists,
+
+      original: a b c   e f   h i   k
+          left: a b   d e f g   i j k
+         right: a b c d e     h i j k
+
+         merge: a b   d e   g   i j k
+
+    we have the following result from diff3:
+
+     [ 'u', 'a',   'a',   'a' ],
+     [ 'u', 'b',   'b',   'b' ],
+     [ 'l', 'c',   undef, 'c' ],
+     [ 'o', undef, 'd',   'd' ],
+     [ 'u', 'e',   'e',   'e' ],
+     [ 'r', 'f',   'f',   undef ], 
+     [ 'o', 'h',   'g',   'h' ],
+     [ 'u', 'i',   'i',   'i' ],
+     [ 'o', undef, 'j',   'j' ],
+     [ 'u', 'k',   'k',   'k' ]
+
+    The first element in each row is the array with the difference:
+
+     c - conflict (no two are the same)
+     l - left is different 
+     o - original is different
+     r - right is different
+     u - unchanged
+
+    The next three elements are the lists from the original, left, and right
+    arrays respectively that the row refers to (in the synopsis, these are
+    "@ancestor", "@a", and "@b", respectively).
+
+  merge
+
+    Given references to three lists of items, "merge" performs a three-way
+    merge. The "merge" function uses the "diff3" function to do most of the
+    work.
+
+    The only callback currently used is "CONFLICT" which should be a
+    reference to a subroutine that accepts two array references. The first
+    array reference is to a list of elements from the left list. The second
+    array reference is to a list of elements from the right list. This
+    callback should return a list of elements to place in the merged list in
+    place of the conflict.
+
+    The default "CONFLICT" callback returns the following:
+
+     q{<!-- ------ START CONFLICT ------ -->},
+     (@left),
+     q{<!-- ---------------------------- -->},
+     (@right),
+     q{<!-- ------  END  CONFLICT ------ -->},
+
+BUGS
+    Most assuredly there are bugs. If a pattern similar to the above example
+    does not work, send it to <jsmith@cpan.org> or report it on
+    <http://rt.cpan.org/>, the CPAN bug tracker.
+
+SEE ALSO
+    the Algorithm::Diff manpage.
+
+AUTHOR
+    James G. Smith, <jsmith@cpan.org>
+
+COPYRIGHT
+    Copyright (C) 2003 Texas A&M University. All Rights Reserved.
+
+    This module is free software; you can redistribute it and/or modify it
+    under the same terms as Perl itself.
+
