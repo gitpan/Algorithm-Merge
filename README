@@ -195,12 +195,12 @@ BUGS
     <http://rt.cpan.org/>, the CPAN bug tracker.
 
     Algorithm::Diff's implementation of "diff" is not symmetric with respect
-    to the input sequences. Because of this, "traverse_sequences3" will
-    calculate the diffs of the second and third sequences as passed and
-    swapped. If the differences are not the same, it will issue an
-    `Algorithm::Diff::diff is not symmetric for second and third
-    sequences...' warning. It will try to handle this, but there may be some
-    cases where it can't.
+    to the input sequences if the second and third sequence are of different
+    lengths. Because of this, "traverse_sequences3" will calculate the diffs
+    of the second and third sequences as passed and swapped. If the
+    differences are not the same, it will issue an `Algorithm::Diff::diff is
+    not symmetric for second and third sequences...' warning. It will try to
+    handle this, but there may be some cases where it can't.
 
 SEE ALSO
     the Algorithm::Diff manpage.

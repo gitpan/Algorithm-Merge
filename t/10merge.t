@@ -92,6 +92,14 @@ push @tests, [
     [qw(< r | l > b < e | d > b     d b e)], # Algorithm::Diff::diff should fail (see BUG section of man page) on this one
 ];
 
+push @tests, [
+    [qw(a         b c         b f b c d)],
+    [qw(  l       b   d       b       d)], 
+    [qw(      r   b       e   b       d b e)],
+    [qw(< l | r > b < d | e > b       d b e)],
+    [qw(< r | l > b < e | d > b       d b e)], # Algorithm::Diff::diff should fail (see BUG section of man page) on this one
+];
+
 
 
 plan tests => scalar(@tests) + scalar(grep { !UNIVERSAL::isa($_, 'CODE') } @tests);

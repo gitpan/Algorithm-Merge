@@ -7,9 +7,9 @@ use strict;
 
 use vars qw(@EXPORT_OK @ISA $VERSION $REVISION);
 
-$VERSION = '0.00_03';
+$VERSION = '0.01';
 
-$REVISION = (qw$Revision: 1.4 $)[-1];
+$REVISION = (qw$Revision: 1.6 $)[-1];
 
 @EXPORT_OK = qw(diff3 merge traverse_sequences3);
 
@@ -124,49 +124,70 @@ sub traverse_sequences3 {
     my $no_change = $callbacks->{'NO_CHANGE'} || sub { };
     my $conflict  = $callbacks->{'CONFLICT'} || sub { };
 
+    my $b_len = scalar(@{$bdoc});
+    my $c_len = scalar(@{$cdoc});
+    my $target_len = $b_len < $c_len ? $b_len : $c_len;
+    my $bc_different_lengths = $b_len != $c_len;
+
+    my(@bdoc_save, @cdoc_save);
+
     my $ab = Algorithm::Diff::diff( $adoc, $bdoc, $keyGen, @_);
     my $ac = Algorithm::Diff::diff( $adoc, $cdoc, $keyGen, @_);
-    my $bc = Algorithm::Diff::diff( $bdoc, $cdoc, $keyGen, @_);
-
-    my $cb = Algorithm::Diff::diff( $cdoc, $bdoc, $keyGen, @_);
-
-    # e.g., if a position is in the AB_A array, then A has something 
-    # not in B at that position in A
-
-    #print Data::Dumper -> Dump([$bc]);
 
     my %diffs = (
         AB_A , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$ab} ) ) ) ],
         AB_B , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$ab} ) ) ) ],
         AC_A , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$ac} ) ) ) ],
         AC_C , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$ac} ) ) ) ],
-        BC_B , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$bc} ) ) ) ],
-        BC_C , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$bc} ) ) ) ],
-        CB_C , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$cb} ) ) ) ],
-        CB_B , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$cb} ) ) ) ],
     );
 
-    if(join(",", @{$diffs{&CB_B}}) ne join(",", @{$diffs{&BC_B}}) ||
-       join(",", @{$diffs{&CB_C}}) ne join(",", @{$diffs{&BC_C}}))
-    {
-        carp "Algorithm::Diff::diff is not symmetric for second and third sequences - results might not be correct";
+    undef $ab; undef $ac;  # free memory
 
-        # merge sequences
-        #BC_B + CB_B => BC_B
-        #BC_B + CB_C => BC_C
-        my $bcb_diffs = Algorithm::Diff::diff( $diffs{&CB_B}, $diffs{&BC_B} );
-        my $bcc_diffs = Algorithm::Diff::diff( $diffs{&CB_C}, $diffs{&BC_C} );
-        # we should have pairs of [ [ -, ... ] , [ +, ... ] ]
-        # we want ... - ... to be added to the BC_{B,C} sequences
-        #warn Data::Dumper -> Dump([$bcb_diffs, $bcc_diffs], [qw(bcb bcc)]);
-        foreach my $h (@{$bcb_diffs}) {
-            my($a, $b) = ($h->[0]->[2], $h->[1]->[2]);
-            splice @{$diffs{&BC_B}}, $h->[0]->[1], 1, ($a);
+    if($bc_different_lengths) {
+        
+        my $bc = Algorithm::Diff::diff( $bdoc, $cdoc, $keyGen, @_);
+        my $cb = Algorithm::Diff::diff( $cdoc, $bdoc, $keyGen, @_);
+
+        #print Data::Dumper -> Dump([$bc]);
+
+        @diffs{(BC_B, BC_C)} = (
+            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$bc} ) ) ) ],
+            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$bc} ) ) ) ],
+        );
+        @diffs{(CB_C, CB_B)} = (
+            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$cb} ) ) ) ],
+            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$cb} ) ) ) ],
+        );
+
+        if(join(",", @{$diffs{&CB_B}}) ne join(",", @{$diffs{&BC_B}}) ||
+           join(",", @{$diffs{&CB_C}}) ne join(",", @{$diffs{&BC_C}}))
+        {
+            @bdoc_save = splice @{$bdoc}, $target_len;
+            @cdoc_save = splice @{$cdoc}, $target_len;
+            $bc = Algorithm::Diff::diff( $bdoc, $cdoc, $keyGen, @_);
+            
+            carp "Algorithm::Diff::diff is not symmetric for second and third sequences - results might not be correct";
         }
-        foreach my $h (@{$bcc_diffs}) {
-            my($a, $b) = ($h->[0]->[2], $h->[1]->[2]);
-            splice @{$diffs{&BC_C}}, $h->[0]->[1], 1, ($b);
+
+        @diffs{(BC_B, BC_C)} = (
+            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$bc} ) ) ) ],
+            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$bc} ) ) ) ],
+        );
+
+        if(scalar(@bdoc_save) || scalar(@cdoc_save)) {
+            push @{$diffs{&BC_B}}, ($target_len .. $b_len) if $target_len < $b_len;
+            push @{$diffs{&BC_C}}, ($target_len .. $c_len) if $target_len < $c_len;
+        
+            push @{$bdoc}, @bdoc_save; undef @bdoc_save;
+            push @{$cdoc}, @cdoc_save; undef @cdoc_save;
         }
+    }
+    else {
+        my $bc = Algorithm::Diff::diff( $bdoc, $cdoc, $keyGen, @_);
+        @diffs{(BC_B, BC_C)} = (
+            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$bc} ) ) ) ],
+            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$bc} ) ) ) ],
+        );
     }
 
     my @pos;
@@ -191,69 +212,69 @@ sub traverse_sequences3 {
 
     my @Callback_Map = (
       [ $no_change,     A, B, C ], # 0  - no matches
-      [ $noop,                  ], # 1  - BC_C
-      [ $conflict,  A, B, undef ], # 2  - BC_B
-      [ $no_change, A, B, C     ], # 3  - BC_B BC_C
-      [ $conflict,  A, B, undef ], # 4  - AC_C
-      [ $c_diff,              C ], # 5  - AC_C BC_C
-      [ $noop,                  ], # 6  - AC_C BC_B
-      [ $noop,                  ], # 7  - AC_C BC_B BC_C
-      [ $a_diff,    A           ], # 8  - AC_A
-      [ $noop,                  ], # 9  - AC_A BC_C
-      [ $c_diff,        A, B    ], # 10 - AC_A BC_B
-      [ $c_diff,        A, B,   ], # 11 - AC_A BC_B BC_C
-      [ $noop,                  ], # 12 - AC_A AC_C
-      [ $noop,                  ], # 13 - AC_A AC_C BC_C
-      [ $c_diff,        A, B,   ], # 14 - AC_A AC_C BC_B
-      [ $c_diff,        A, B, C ], # 15 - AC_A AC_C BC_B BC_C
-      [ $b_diff,           B    ], # 16
-      [ $a_diff,           B, C ], # 17
-      [ $b_diff,           B    ], # 18
-      [ $c_diff,        A, B    ], # 19
-      [ $a_diff,           B, C ], # 20
-      [ $noop,                  ], # 21
-      [ $noop,                  ], # 22
-      [ $conflict,      A, B, C ], # 23 
-      [ $b_diff,           B    ], # 24 
-      [ $noop,                  ], # 25
-      [ $noop,                  ], # 26
-      [ $noop,                  ], # 27
-      [ $noop,                  ], # 28
-      [ $conflict,  undef, B, C ], # 29
-      [ $noop,                  ], # 30
-      [ $noop,                  ], # 31
-      [ $no_change,     A, B, C ], # 32
-      [ $b_diff,        A,    C ], # 33
-      [ $a_diff,        A       ], # 34
-      [ $b_diff,        A,    C ], # 35
-      [ $b_diff,        A,    C ], # 36
-      [ $noop,                  ], # 37
-      [ $noop,                  ], # 38
-      [ $conflict,  A, undef, C ], # 39
-      [ $a_diff,        A,      ], # 40
-      [ $a_diff,        A       ], # 41
-      [ $a_diff,        A       ], # 42
-      [ $a_diff,        A       ], # 43
-      [ $c_diff,        A, B    ], # 44
-      [ $conflict,      A, B, C ], # 45
-      [ $noop,                  ], # 46
-      [ $noop,                  ], # 47
-      [ $conflict,  A, B, undef ], # 48
-      [ $b_diff,        A,    C ], # 49
-      [ $noop,                  ], # 50
-      [ $a_diff,        A, B, C ], # 51
-      [ $a_diff,           B, C ], # 52
-      [ $noop,                  ], # 53
-      [ $noop,                  ], # 54
-      [ $noop,                  ], # 55
-      [ $noop,                  ], # 56
-      [ $noop,                  ], # 57
-      [ $conflict,      A, B, C ], # 58
-      [ $noop,                  ], # 59
-      [ $b_diff,        A, B, C ], # 60
-      [ $conflict,      A, B, C ], # 61
-      [ $conflict,      A, B, C ], # 62
-      [ $conflict,      A, B, C ], # 63
+      [ $noop,                  ], # 1  -                          BC_C
+      [ $b_diff,           B    ], #*2  -                     BC_B
+      [ $noop,                  ], # 3  -                     BC_B BC_C
+      [ $noop,                  ], # 4  -                AC_C
+      [ $c_diff,              C ], # 5  -                AC_C      BC_C
+      [ $noop,                  ], # 6  -                AC_C BC_B
+      [ $noop,                  ], # 7  -                AC_C BC_B BC_C
+      [ $a_diff,        A       ], # 8  -           AC_A
+      [ $noop,                  ], # 9  -           AC_A           BC_C
+      [ $c_diff,        A, B    ], # 10 -           AC_A      BC_B
+      [ $c_diff,        A, B,   ], # 11 -           AC_A      BC_B BC_C
+      [ $noop,                  ], # 12 -           AC_A AC_C
+      [ $noop,                  ], # 13 -           AC_A AC_C      BC_C
+      [ $c_diff,        A, B,   ], # 14 -           AC_A AC_C BC_B
+      [ $c_diff,        A, B, C ], # 15 -           AC_A AC_C BC_B BC_C
+      [ $noop,                  ], # 16 -      AB_B
+      [ $noop,                  ], # 17 -      AB_B                BC_C
+      [ $noop,                  ], # 18 -      AB_B           BC_B
+      [ $noop,                  ], # 19 -      AB_B           BC_B BC_C
+      [ $a_diff,           B, C ], # 20 -      AB_B      AC_C
+      [ $noop,                  ], # 21 -      AB_B      AC_C      BC_C
+      [ $noop,                  ], # 22 -      AB_B      AC_C BC_B
+      [ $conflict,      A, B, C ], # 23 -      AB_B      AC_C BC_B BC_C
+      [ $b_diff,           B    ], # 24 -      AB_B AC_A
+      [ $noop,                  ], # 25 -      AB_B AC_A           BC_C
+      [ $noop,                  ], # 26 -      AB_B AC_A      BC_B
+      [ $noop,                  ], # 27 -      AB_B AC_A      BC_B BC_C
+      [ $noop,                  ], # 28 -      AB_B AC_A AC_C
+      [ $noop,                  ], # 29 -      AB_B AC_A AC_C      BC_C
+      [ $noop,                  ], # 30 -      AB_B AC_A AC_C BC_B
+      [ $noop,                  ], # 31 -      AB_B AC_A AC_C BC_B BC_C
+      [ $no_change,     A, B, C ], # 32 - AB_A
+      [ $b_diff,        A,    C ], # 33 - AB_A                     BC_C
+      [ $noop,                  ], # 34 - AB_A                BC_B
+      [ $b_diff,        A,    C ], # 35 - AB_A                BC_B BC_C
+      [ $noop,                  ], # 36 - AB_A           AC_C
+      [ $noop,                  ], # 37 - AB_A           AC_C      BC_C
+      [ $noop,                  ], # 38 - AB_A           AC_C BC_B
+      [ $noop,                  ], # 39 - AB_A           AC_C BC_B BC_C
+      [ $a_diff,        A,      ], # 40 - AB_A      AC_A
+      [ $noop,                  ], # 41 - AB_A      AC_A           BC_C
+      [ $a_diff,        A       ], # 42 - AB_A      AC_A      BC_B
+      [ $noop,                  ], # 43 - AB_A      AC_A      BC_B BC_C
+      [ $noop,                  ], # 44 - AB_A      AC_A AC_C
+      [ $noop,                  ], # 45 - AB_A      AC_A AC_C      BC_C
+      [ $noop,                  ], # 46 - AB_A      AC_A AC_C BC_B
+      [ $noop,                  ], # 47 - AB_A      AC_A AC_C BC_B BC_C
+      [ $noop,                  ], # 48 - AB_A AB_B
+      [ $b_diff,        A,    C ], # 49 - AB_A AB_B                BC_C
+      [ $noop,                  ], # 50 - AB_A AB_B           BC_B
+      [ $a_diff,        A, B, C ], # 51 - AB_A AB_B           BC_B BC_C
+      [ $noop,                  ], # 52 - AB_A AB_B      AC_C
+      [ $noop,                  ], # 53 - AB_A AB_B      AC_C      BC_C
+      [ $noop,                  ], # 54 - AB_A AB_B      AC_C BC_B
+      [ $noop,                  ], # 55 - AB_A AB_B      AC_C BC_B BC_C
+      [ $noop,                  ], # 56 - AB_A AB_B AC_A
+      [ $noop,                  ], # 57 - AB_A AB_B AC_A           BC_C
+      [ $noop,                  ], # 58 - AB_A AB_B AC_A      BC_B
+      [ $noop,                  ], # 59 - AB_A AB_B AC_A      BC_B BC_C
+      [ $noop,                  ], # 60 - AB_A AB_B AC_A AC_C
+      [ $noop,                  ], # 61 - AB_A AB_B AC_A AC_C      BC_C
+      [ $noop,                  ], # 62 - AB_A AB_B AC_A AC_C BC_B
+      [ $conflict,      A, B, C ], # 63 - AB_A AB_B AC_A AC_C BC_B BC_C
     );
 
     my $t; # temporary values
@@ -346,7 +367,7 @@ sub merge {
 
     foreach my $h (@{$diff}) {
         my $i = 0;
-#        print "op: ", $h -> [0];
+        #print "op: ", $h -> [0];
         if($h -> [0] eq 'c') { # conflict
             push @{$conflict[0]}, $h -> [2] if defined $h -> [2];
             push @{$conflict[1]}, $h -> [3] if defined $h -> [3];
@@ -369,7 +390,7 @@ sub merge {
                 push @ret, $h -> [3] if defined $h -> [3];
             }
         }
-#        print " : ", join(" ", @ret), " [$$h[1],$$h[2],$$h[3]]\n";
+        #print " : ", join(" ", @ret), " [$$h[1],$$h[2],$$h[3]]\n";
     }
 
     if(wantarray) {
@@ -605,7 +626,8 @@ example does not work, send it to <jsmith@cpan.org> or report it on
 <http://rt.cpan.org/>, the CPAN bug tracker.
 
 L<Algorithm::Diff|Algorithm::Diff>'s implementation of C<diff> is not 
-symmetric with respect to the input sequences.  Because of this, 
+symmetric with respect to the input sequences if the second and third 
+sequence are of different lengths.  Because of this, 
 C<traverse_sequences3> will calculate the diffs of the second and third 
 sequences as passed and swapped.  If the differences are not the same, 
 it will issue an `Algorithm::Diff::diff is not symmetric for second 
