@@ -123,6 +123,27 @@ push @tests, [
     [qw(a b c   e f g      )], # merge
 ];
 
+push @tests, [
+    [qw(0 1 2 3 4   5 6 7 8 9)],
+    [qw(0 1 2 3 4 x 5 6 7 8 9)],
+    [qw(0 1 2 3 4   5 6 7 8 9)],
+    [qw(0 1 2 3 4 x 5 6 7 8 9)],
+];
+
+push @tests, [
+    [qw(0 1 2   6 7 8 x)],
+    [qw(0 1 2 4 6 7 8 x)],
+    [qw(0 1 3   5     x)],
+    [qw(0 1 3 4 5     x)]
+];
+
+push @tests, [
+    [qw(0 1 2 3 4 7 9 b)],
+    [qw(0 1 2 3 5 8 a b)],
+    [qw(0       6 8 a b)],
+    [qw(0 6 < 5 | > 8 a b)],
+    [qw(0 6 < | 5 > 8 a b)],
+];
 
 
 $tests = scalar(@tests) + scalar(grep { !UNIVERSAL::isa($_, 'CODE') } @tests) + 1;

@@ -3,13 +3,13 @@ package Algorithm::Merge;
 use Algorithm::Diff ();
 use Carp;
 use strict;
-#use Data::Dumper;
+use Data::Dumper;
 
 use vars qw(@EXPORT_OK @ISA $VERSION $REVISION);
 
-$VERSION = '0.04';
+$VERSION = '0.05';
 
-$REVISION = (qw$Revision: 1.10 $)[-1];
+$REVISION = (qw$Revision: 1.11 $)[-1];
 
 @EXPORT_OK = qw(diff3 merge traverse_sequences3);
 
@@ -85,7 +85,7 @@ sub diff3 {
             push @ret, [ 'r', undef, undef, $docb -> [$_[0]] ];
         }
         elsif(@_ == 2) {
-            push @ret, [ 'r', $pivot -> [$_[0]], $doca -> [$_[0]], undef ];
+            push @ret, [ 'r', $pivot -> [$_[0]], $doca -> [$_[1]], undef ];
         }
         elsif(@_ == 3) {
             push @ret, [ 'r', $pivot -> [$_[0]], $doca -> [$_[1]], $docb -> [$_[2]] ];
@@ -227,7 +227,7 @@ sub traverse_sequences3 {
 # Callback_Map is indexed by the sum of AB_A, AB_B, ..., as indicated by @matches
 # this isn't the most efficient, but it's a bit easier to maintain and 
 # read than if it were broken up into separate arrays
-# more than half the entries are not $noop - it would seem then that no 
+# half the entries are not $noop - it would seem then that no 
 # entries should be $noop.  I need patterns to figure out what the 
 # other entries are.
 
@@ -274,7 +274,6 @@ sub traverse_sequences3 {
       [ $noop,                  ], # 39 - AB_A           AC_C BC_B BC_C
       [ $a_diff,        A,      ], # 40 - AB_A      AC_A
       [ $noop,                  ], # 41 - AB_A      AC_A           BC_C
-      #[ $no_change,     A, B, C ], # 41 - AB_A      AC_A           BC_C
       [ $a_diff,        A       ], # 42 - AB_A      AC_A      BC_B
       [ $noop,                  ], # 43 - AB_A      AC_A      BC_B BC_C
       [ $noop,                  ], # 44 - AB_A      AC_A AC_C
@@ -284,7 +283,6 @@ sub traverse_sequences3 {
       [ $noop,                  ], # 48 - AB_A AB_B
       [ $b_diff,        A,    C ], # 49 - AB_A AB_B                BC_C
       [ $noop,                  ], # 50 - AB_A AB_B           BC_B
-      #[ $a_diff,        A, B, C ], # 51 - AB_A AB_B           BC_B BC_C
       [ $b_diff,        A, B, C ], # 51 - AB_A AB_B           BC_B BC_C
       [ $a_diff,           B, C ], # 52 - AB_A AB_B      AC_C
       [ $noop,                  ], # 53 - AB_A AB_B      AC_C      BC_C
@@ -295,8 +293,8 @@ sub traverse_sequences3 {
       [ $b_diff,        A, B, D ], # 58 - AB_A AB_B AC_A      BC_B
       [ $noop,                  ], # 59 - AB_A AB_B AC_A      BC_B BC_C
       [ $a_diff,        A, B, C ], # 60 - AB_A AB_B AC_A AC_C
-      [ $noop,                  ], # 61 - AB_A AB_B AC_A AC_C      BC_C
-      [ $noop,                  ], # 62 - AB_A AB_B AC_A AC_C BC_B
+      [ $conflict,      A, D, C ], # 61 - AB_A AB_B AC_A AC_C      BC_C
+      [ $conflict,      A, B, D ], # 62 - AB_A AB_B AC_A AC_C BC_B
       [ $conflict,      A, B, C ], # 63 - AB_A AB_B AC_A AC_C BC_B BC_C
     );
 
@@ -333,14 +331,14 @@ sub traverse_sequences3 {
         foreach (@args) {
             $pos[$_]++;
             if($_ eq A) {
-                shift @{$diffs{&AB_A}} if $matches[AB_A];
-                shift @{$diffs{&AC_A}} if $matches[AC_A];
+                shift @{$diffs{&AB_A}} while @{$diffs{&AB_A}} && $diffs{&AB_A}[0] < $pos[$_];# if $matches[AB_A];
+                shift @{$diffs{&AC_A}} while @{$diffs{&AC_A}} && $diffs{&AC_A}[0] < $pos[$_];#if $matches[AC_A];
             } elsif($_ eq B) {
-                shift @{$diffs{&AB_B}} if $matches[AB_B];
-                shift @{$diffs{&BC_B}} if $matches[BC_B];
+                shift @{$diffs{&AB_B}} while @{$diffs{&AB_B}} && $diffs{&AB_B}[0] < $pos[$_];#if $matches[AB_B];
+                shift @{$diffs{&BC_B}} while @{$diffs{&BC_B}} && $diffs{&BC_B}[0] < $pos[$_];#if $matches[BC_B];
             } elsif($_ eq C) {
-                shift @{$diffs{&AC_C}} if $matches[AC_C];
-                shift @{$diffs{&BC_C}} if $matches[BC_C];
+                shift @{$diffs{&AC_C}} while @{$diffs{&AC_C}} && $diffs{&AC_C}[0] < $pos[$_];#if $matches[AC_C];
+                shift @{$diffs{&BC_C}} while @{$diffs{&BC_C}} && $diffs{&BC_C}[0] < $pos[$_];#if $matches[BC_C];
             }
         }
         last unless @args;
@@ -432,27 +430,37 @@ sub merge {
 }
 
 
+__END__
 #
 # For testing:
 #
-#sub main::diag {
-#    warn join("", @_) , "\n";
-#}
-#
-#print join(" ", merge(
-#    [qw(a b c d       h i j)], # ancestor
-#    [qw(a b c d   f   h i j)], # left
-#    [qw(a b c   e   g      )], # right
-#
-#    {
-#        CONFLICT => sub ($$) { (
-#            q{<}, @{$_[0]}, q{|}, @{$_[1]}, q{>}
-#        ) },
-#    },
-#)), "\n";
+sub main::diag {
+    warn join("", @_) , "\n";
+}
+
+print join(" ", merge(
+#print Data::Dumper -> Dump([
+#    merge(
+#    #[qw(a b c d       h i j)], # ancestor
+#    #[qw(a b c d   f   h i j)], # left
+#    #[qw(a b c   e   g      )], # right
+    [qw(0 1 2 3 4 7 9 b)],
+    [qw(0 6       8 a b)],
+    [qw(0 1 2 3 5 8 a b)],
+##
+    {
+        CONFLICT => sub ($$) { (
+            q{<}, @{$_[0]}, q{|}, @{$_[1]}, q{>}
+        ) },
+    },
+)), "\n";
+#)]), "\n";
 #print join(" ", @{
-#    [qw(a b c   e f g)], # merge
+#    [qw(0 1 @ < 3 | # > 6)]
 #  }), "\n";
+
+1;
+__END__
 
 
 1;
