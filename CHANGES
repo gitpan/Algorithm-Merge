@@ -1,0 +1,13 @@
+Changes for Algorithm::Merge
+----------------------------
+
+0.02  -  19 Feb 2003
+
+  Change from Algorithm::Diff::diff to Algorithm::Diff::traverse_sequences.  
+  Saves a little time and some memory, especially for large sequences.
+
+  Added CHANGES file to track changes.
+
+0.01  -  17 Feb 2003
+
+  Initial beta release.

@@ -7,9 +7,9 @@ use strict;
 
 use vars qw(@EXPORT_OK @ISA $VERSION $REVISION);
 
-$VERSION = '0.01';
+$VERSION = '0.02';
 
-$REVISION = (qw$Revision: 1.6 $)[-1];
+$REVISION = (qw$Revision: 1.8 $)[-1];
 
 @EXPORT_OK = qw(diff3 merge traverse_sequences3);
 
@@ -131,48 +131,49 @@ sub traverse_sequences3 {
 
     my(@bdoc_save, @cdoc_save);
 
-    my $ab = Algorithm::Diff::diff( $adoc, $bdoc, $keyGen, @_);
-    my $ac = Algorithm::Diff::diff( $adoc, $cdoc, $keyGen, @_);
+    # make these into traverse_sequences calls
+    my($left, $right);
+    my %diffs;
 
-    my %diffs = (
-        AB_A , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$ab} ) ) ) ],
-        AB_B , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$ab} ) ) ) ],
-        AC_A , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$ac} ) ) ) ],
-        AC_C , [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$ac} ) ) ) ],
-    );
+    my $ts_callbacks = {
+        DISCARD_A => sub { # discard left
+            push @{$diffs{$left}}, $_[0];
+        },
+        DISCARD_B => sub { # discard right
+            push @{$diffs{$right}}, $_[1];
+        },
+    };
 
-    undef $ab; undef $ac;  # free memory
+    @diffs{(AB_A, AB_B)} = ([], []);
+    $left = AB_A; $right = AB_B;
+    Algorithm::Diff::traverse_sequences( $adoc, $bdoc, $ts_callbacks, $keyGen, @_);
+
+    @diffs{(AC_A, AC_C)} = ([], []);
+    $left = AC_A; $right = AC_C;
+    Algorithm::Diff::traverse_sequences( $adoc, $cdoc, $ts_callbacks, $keyGen, @_);
 
     if($bc_different_lengths) {
         
-        my $bc = Algorithm::Diff::diff( $bdoc, $cdoc, $keyGen, @_);
-        my $cb = Algorithm::Diff::diff( $cdoc, $bdoc, $keyGen, @_);
+        @diffs{(CB_C, CB_B)} = ([], []);
+        $left = CB_C; $right = CB_B;
+        Algorithm::Diff::traverse_sequences( $cdoc, $bdoc, $ts_callbacks, $keyGen, @_);
 
-        #print Data::Dumper -> Dump([$bc]);
-
-        @diffs{(BC_B, BC_C)} = (
-            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$bc} ) ) ) ],
-            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$bc} ) ) ) ],
-        );
-        @diffs{(CB_C, CB_B)} = (
-            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$cb} ) ) ) ],
-            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$cb} ) ) ) ],
-        );
+        @diffs{(BC_B, BC_C)} = ([], []);  
+        $left = BC_B; $right = BC_C; 
+        Algorithm::Diff::traverse_sequences( $bdoc, $cdoc, $ts_callbacks, $keyGen, @_);
 
         if(join(",", @{$diffs{&CB_B}}) ne join(",", @{$diffs{&BC_B}}) ||
            join(",", @{$diffs{&CB_C}}) ne join(",", @{$diffs{&BC_C}}))
         {
             @bdoc_save = splice @{$bdoc}, $target_len;
             @cdoc_save = splice @{$cdoc}, $target_len;
-            $bc = Algorithm::Diff::diff( $bdoc, $cdoc, $keyGen, @_);
             
             carp "Algorithm::Diff::diff is not symmetric for second and third sequences - results might not be correct";
         }
 
-        @diffs{(BC_B, BC_C)} = (
-            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$bc} ) ) ) ],
-            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$bc} ) ) ) ],
-        );
+        @diffs{(BC_B, BC_C)} = ([], []);
+        $left = BC_B; $right = BC_C;
+        Algorithm::Diff::traverse_sequences( $bdoc, $cdoc, $ts_callbacks, $keyGen, @_);
 
         if(scalar(@bdoc_save) || scalar(@cdoc_save)) {
             push @{$diffs{&BC_B}}, ($target_len .. $b_len) if $target_len < $b_len;
@@ -183,11 +184,9 @@ sub traverse_sequences3 {
         }
     }
     else {
-        my $bc = Algorithm::Diff::diff( $bdoc, $cdoc, $keyGen, @_);
-        @diffs{(BC_B, BC_C)} = (
-            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '-' } ( map { @{$_} } @{$bc} ) ) ) ],
-            [ sort { $a <=> $b } ( map { $_ -> [1] } ( grep { $_ -> [0] eq '+' } ( map { @{$_} } @{$bc} ) ) ) ],
-        );
+        @diffs{(BC_B, BC_C)} = ([], []);
+        $left = BC_B; $right = BC_C;
+        Algorithm::Diff::traverse_sequences( $bdoc, $cdoc, $ts_callbacks, $keyGen, @_);
     }
 
     my @pos;
@@ -423,7 +422,7 @@ Algorithm::Merge - Three-way merge and diff
 
 =head1 SYNOPSIS
 
- use Algorithm::Merge qw(merge diff3);
+ use Algorithm::Merge qw(merge diff3 traverse_sequences3);
 
  @merged = merge(\@ancestor, \@a, \@b, { 
                CONFLICT => sub { } 
@@ -471,7 +470,8 @@ Algorithm::Merge - Three-way merge and diff
 This module complements L<Algorithm::Diff|Algorithm::Diff> by 
 providing three-way merge and diff functions.
 
-In this documentation, the first list to C<diff3> and C<merge> is 
+In this documentation, the first list to C<diff3>, C<merge>, and 
+C<traverse_sequences3> is 
 called the `original' list.  The second list is the `left' list.  The 
 third list is the `right' list.
 
@@ -625,14 +625,14 @@ Most assuredly there are bugs.  If a pattern similar to the above
 example does not work, send it to <jsmith@cpan.org> or report it on 
 <http://rt.cpan.org/>, the CPAN bug tracker.
 
-L<Algorithm::Diff|Algorithm::Diff>'s implementation of C<diff> is not 
-symmetric with respect to the input sequences if the second and third 
-sequence are of different lengths.  Because of this, 
-C<traverse_sequences3> will calculate the diffs of the second and third 
-sequences as passed and swapped.  If the differences are not the same, 
-it will issue an `Algorithm::Diff::diff is not symmetric for second 
-and third sequences...' warning.  It will try to handle this, but there 
-may be some cases where it can't.
+L<Algorithm::Diff|Algorithm::Diff>'s implementation of 
+C<traverse_sequences> may not be symmetric with respect to the input 
+sequences if the second and third sequence are of different lengths.  
+Because of this, C<traverse_sequences3> will calculate the diffs of 
+the second and third sequences as passed and swapped.  If the differences 
+are not the same, it will issue an `Algorithm::Diff::diff is not symmetric 
+for second and third sequences...' warning.  It will try to handle 
+this, but there may be some cases where it can't.
 
 =head1 SEE ALSO
 

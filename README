@@ -2,7 +2,7 @@ NAME
     Algorithm::Merge - Three-way merge and diff
 
 SYNOPSIS
-     use Algorithm::Merge qw(merge diff3);
+     use Algorithm::Merge qw(merge diff3 traverse_sequences3);
 
      @merged = merge(\@ancestor, \@a, \@b, { 
                    CONFLICT => sub { } 
@@ -48,9 +48,9 @@ USAGE
     This module complements Algorithm::Diff by providing three-way merge and
     diff functions.
 
-    In this documentation, the first list to "diff3" and "merge" is called
-    the `original' list. The second list is the `left' list. The third list
-    is the `right' list.
+    In this documentation, the first list to "diff3", "merge", and
+    "traverse_sequences3" is called the `original' list. The second list is
+    the `left' list. The third list is the `right' list.
 
     The optional key generation arguments are the same as in
     Algorithm::Diff. See the Algorithm::Diff manpage for more information.
@@ -194,13 +194,14 @@ BUGS
     does not work, send it to <jsmith@cpan.org> or report it on
     <http://rt.cpan.org/>, the CPAN bug tracker.
 
-    Algorithm::Diff's implementation of "diff" is not symmetric with respect
-    to the input sequences if the second and third sequence are of different
-    lengths. Because of this, "traverse_sequences3" will calculate the diffs
-    of the second and third sequences as passed and swapped. If the
-    differences are not the same, it will issue an `Algorithm::Diff::diff is
-    not symmetric for second and third sequences...' warning. It will try to
-    handle this, but there may be some cases where it can't.
+    Algorithm::Diff's implementation of "traverse_sequences" may not be
+    symmetric with respect to the input sequences if the second and third
+    sequence are of different lengths. Because of this,
+    "traverse_sequences3" will calculate the diffs of the second and third
+    sequences as passed and swapped. If the differences are not the same, it
+    will issue an `Algorithm::Diff::diff is not symmetric for second and
+    third sequences...' warning. It will try to handle this, but there may
+    be some cases where it can't.
 
 SEE ALSO
     the Algorithm::Diff manpage.
