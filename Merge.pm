@@ -7,7 +7,7 @@ use Data::Dumper;
 
 use vars qw(@EXPORT_OK @ISA $VERSION $REVISION);
 
-$VERSION = '0.05';
+$VERSION = '0.06';
 
 $REVISION = (qw$Revision: 1.11 $)[-1];
 
@@ -22,6 +22,10 @@ sub diff3 {
     my $keyGen            = shift;
 
     my @ret;
+
+    if(@$doca == 0 && @$docb == 0 && @$pivot == 0) {
+      return [ [ ] ];
+    }
 
     my $no_change;
 
@@ -82,13 +86,13 @@ sub diff3 {
 
     my $diff_c = sub {
         if(@_ == 1) {
-            push @ret, [ 'r', undef, undef, $docb -> [$_[0]] ];
+            push @ret, [ 'r', undef, undef, (defined($_[0]) ? $docb -> [$_[0]] : undef) ];
         }
         elsif(@_ == 2) {
-            push @ret, [ 'r', $pivot -> [$_[0]], $doca -> [$_[1]], undef ];
+            push @ret, [ 'r', (defined($_[0]) ? $pivot -> [$_[0]] : undef), (defined($_[1]) ? $doca -> [$_[1]] : undef), undef ];
         }
         elsif(@_ == 3) {
-            push @ret, [ 'r', $pivot -> [$_[0]], $doca -> [$_[1]], $docb -> [$_[2]] ];
+            push @ret, [ 'r', (defined($_[0]) ? $pivot -> [$_[0]] : undef), (defined($_[1]) ? $doca -> [$_[1]] : undef), (defined($_[0]) ? $docb -> [$_[2]] : undef)];
         }
     };
 
@@ -249,7 +253,7 @@ sub traverse_sequences3 {
       [ $c_diff,        A, B,   ], # 14 -           AC_A AC_C BC_B
       [ $c_diff,        A, B, C ], # 15 -           AC_A AC_C BC_B BC_C
       [ $noop,                  ], # 16 -      AB_B
-      [ $noop,                  ], # 17 -      AB_B                BC_C
+      [ $no_change,             ], # 17 -      AB_B                BC_C
       [ $b_diff,           B    ], # 18 -      AB_B           BC_B
       [ $noop,                  ], # 19 -      AB_B           BC_B BC_C
       [ $a_diff,           B, C ], # 20 -      AB_B      AC_C
@@ -695,7 +699,7 @@ James G. Smith, <jsmith@cpan.org>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2003  Texas A&M University.  All Rights Reserved.
+Copyright (C) 2003, 2007  Texas A&M University.  All Rights Reserved.
 
 This module is free software; you may redistribute it and/or
 modify it under the same terms as Perl itself.

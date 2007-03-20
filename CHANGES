@@ -1,6 +1,13 @@
 Changes for Algorithm::Merge
 ----------------------------
 
+0.06 -   20 Mar 2007
+
+  Fixed outstanding tickets on rt.cpan.org (#11184, #14483).
+
+  Fixed a bug found by Mark Glines.  This resulted in an additional
+  entry in the callback map.
+
 0.05  -   6 Nov 2003
 
   Added some more entries to the callback map.

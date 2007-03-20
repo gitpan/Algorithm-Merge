@@ -145,6 +145,21 @@ push @tests, [
     [qw(0 6 < | 5 > 8 a b)],
 ];
 
+push @tests, [
+    [qw(1   3 4 5)],
+    [qw(1 a 3 4 5)],
+    [qw(1 b 3 4 5)],
+    [qw(1 < a | b > 3 4 5)],
+    [qw(1 < b | a > 3 4 5)],
+];
+
+push @tests, [
+    [qw(1 2 3 4 5 6 7)],
+    [qw(1 2       6 7)],
+    [qw(1 2 3 0 5 6 7)],
+    [qw(1 2   0   6 7)],
+    [qw(1 2   0   6 7)],
+];
 
 $tests = scalar(@tests) + scalar(grep { !UNIVERSAL::isa($_, 'CODE') } @tests) + 1;
 
@@ -210,9 +225,9 @@ foreach my $t (@tests) {
         ok 1;
     }
     else {
-        #my $diff = Algorithm::Diff::diff($out, $t -> [4] || $t -> [3]);
+        my $diff = Algorithm::Diff::diff($out, $t -> [4] || $t -> [3]);
 
-        #warn "qw(", join(" ", @{$out}), ") ne qw(", join(" ", @{$t -> [4] || $t -> [3]}), ")\n" if $ENV{DEBUG} && @{$diff};
+        warn "qw(", join(" ", @{$out}), ") ne qw(", join(" ", @{$t -> [4] || $t -> [3]}), ")\n" if $ENV{DEBUG} && @{$diff};
         #ok !@{$diff}; # ok if there's no difference
         is_deeply($out, $t -> [4] || $t -> [3]);
     }

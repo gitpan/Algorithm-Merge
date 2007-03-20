@@ -52,11 +52,26 @@ foreach $i (0, 1) {
                 [ ($i ? 'a' : () ) ],
                 [ ($j ? 'b' : () ) ],
                 [ ($k ? 'c' : () ) ],
-                [ $results[$i*4 + $j*2 + $k], ],
+                [ $results[$i*4 + $j*2 + $k] ],
             ];
         }
     }
 }
+
+push @tests, [
+  [ qw(1 2 3 4 5 6 7) ],
+  [ qw(1 2       6 7) ],
+  [ qw(1 2 3 0 5 6 7) ],
+  [ [                                qw(u 1 1 1) ],
+    [                                qw(u 2 2 2) ],
+    [ map { $_ eq '-' ? undef : $_ } qw(l 3 - 3) ],
+    [ map { $_ eq '-' ? undef : $_ } qw(r 4 - 0) ],
+    [ map { $_ eq '-' ? undef : $_ } qw(l 5 - 5) ],
+    [                                qw(u 6 6 6) ],
+    [                                qw(u 7 7 7) ]
+  ]
+];
+  
 
 $tests = scalar(@tests) + 1;
 
@@ -87,7 +102,7 @@ foreach my $t (@tests) {
             #my $sout = join(";", map { join(":", map { defined($_) ? "[$_]" : "" } @{$_}) } @{$out});
             #my $sexp = join(";", map { join(":", map { defined($_) ? "[$_]" : "" } @{$_}) } @{$t->[3]});
 
-            #warn Data::Dumper -> Dump([$out, $t->[3]], [qw(Out Expected Diff)]) if $ENV{DEBUG} && $sout ne $sexp;
+#            warn Data::Dumper -> Dump([$out, $t->[3]], [qw(Out Expected Diff)]); # if $ENV{DEBUG} && $sout ne $sexp;
             #ok $sout eq $sexp;
             is_deeply($out, $t->[3]);
         }
