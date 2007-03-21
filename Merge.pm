@@ -7,7 +7,7 @@ use Data::Dumper;
 
 use vars qw(@EXPORT_OK @ISA $VERSION $REVISION);
 
-$VERSION = '0.06';
+$VERSION = '0.07';
 
 $REVISION = (qw$Revision: 1.11 $)[-1];
 
@@ -259,7 +259,7 @@ sub traverse_sequences3 {
       [ $a_diff,           B, C ], # 20 -      AB_B      AC_C
       [ $noop,                  ], # 21 -      AB_B      AC_C      BC_C
       [ $noop,                  ], # 22 -      AB_B      AC_C BC_B
-      [ $conflict,      A, B, C ], # 23 -      AB_B      AC_C BC_B BC_C
+      [ $conflict,      D, B, C ], # 23 -      AB_B      AC_C BC_B BC_C
       [ $b_diff,           B    ], # 24 -      AB_B AC_A
       [ $noop,                  ], # 25 -      AB_B AC_A           BC_C
       [ $c_diff,        D, B, C ], # 26 -      AB_B AC_A      BC_B

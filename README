@@ -53,10 +53,9 @@ USAGE
     the `left' list. The third list is the `right' list.
 
     The optional key generation arguments are the same as in
-    Algorithm::Diff. See the Algorithm::Diff manpage for more information.
+    Algorithm::Diff. See Algorithm::Diff for more information.
 
   diff3
-
     Given references to three lists of items, "diff3" performs a three-way
     difference.
 
@@ -97,10 +96,9 @@ USAGE
 
     The next three elements are the lists from the original, left, and right
     arrays respectively that the row refers to (in the synopsis, these are
-    "@ancestor", "@a", and "@b", respectively).
+    @ancestor, @a, and @b, respectively).
 
   merge
-
     Given references to three lists of items, "merge" performs a three-way
     merge. The "merge" function uses the "diff3" function to do most of the
     work.
@@ -121,7 +119,6 @@ USAGE
      q{<!-- ------  END  CONFLICT ------ -->},
 
   traverse_sequences3
-
     This is the workhorse function that goes through the three sequences and
     calls the callback functions.
 
@@ -204,13 +201,13 @@ BUGS
     be some cases where it can't.
 
 SEE ALSO
-    the Algorithm::Diff manpage.
+    Algorithm::Diff.
 
 AUTHOR
     James G. Smith, <jsmith@cpan.org>
 
 COPYRIGHT
-    Copyright (C) 2003 Texas A&M University. All Rights Reserved.
+    Copyright (C) 2003, 2007 Texas A&M University. All Rights Reserved.
 
     This module is free software; you may redistribute it and/or modify it
     under the same terms as Perl itself.

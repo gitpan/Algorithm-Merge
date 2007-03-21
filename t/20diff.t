@@ -71,6 +71,19 @@ push @tests, [
     [                                qw(u 7 7 7) ]
   ]
 ];
+
+push @tests, [
+  [ qw(1   3 4 5) ],
+  [ qw(1 a 3 4 5) ],
+  [ qw(1 b 3 4 5) ],
+  [ [                                qw(u 1 1 1) ],
+    [ map { $_ eq '-' ? undef : $_ } qw(c - a b) ],
+    [                                qw(u 3 3 3) ],
+    [                                qw(u 4 4 4) ],
+    [                                qw(u 5 5 5) ],
+  ]
+];
+    
   
 
 $tests = scalar(@tests) + 1;

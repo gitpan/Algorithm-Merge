@@ -1,6 +1,11 @@
 Changes for Algorithm::Merge
 ----------------------------
 
+0.07 -   21 Mar 2007
+
+  Fixed an entry in the internal state mapping that was causing a one-off
+  error in certain cases.  Reported by Mark Glines.
+
 0.06 -   20 Mar 2007
 
   Fixed outstanding tickets on rt.cpan.org (#11184, #14483).
