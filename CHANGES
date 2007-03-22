@@ -1,6 +1,11 @@
 Changes for Algorithm::Merge
 ----------------------------
 
+0.08 -   21 Mar 2007
+
+  Fixed a problem where certain differences would cause corruption 
+  later in the traverse_sequences3 output.  Reported by Mark Glines.
+
 0.07 -   21 Mar 2007
 
   Fixed an entry in the internal state mapping that was causing a one-off

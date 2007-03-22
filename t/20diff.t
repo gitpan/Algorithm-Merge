@@ -84,7 +84,48 @@ push @tests, [
   ]
 ];
     
-  
+push @tests, [
+  [ qw(  o p p q r s) ],
+  [ qw(n o p   q r  ) ],
+  [ qw(N o p p q r  ) ],
+  [ [ map { $_ eq '-' ? undef : $_ } qw(c - n N) ],
+    [                                qw(u o o o) ],
+    [ map { $_ eq '-' ? undef : $_ } qw(l p - p) ],
+    [                                qw(u p p p) ],
+    [                                qw(u q q q) ],
+    [                                qw(u r r r) ],
+    [ map { $_ eq '-' ? undef : $_ } qw(o s - -) ],
+  ]
+];
+
+push @tests, [
+  [ qw(  o p p q r s) ],
+  [ qw(n o p   q r  ) ],
+  [ qw(N o p P q r  ) ],
+  [ [ map { $_ eq '-' ? undef : $_ } qw(c - n N) ],
+    [                                qw(u o o o) ],
+    [                                qw(u p p p) ],
+    [ map { $_ eq '-' ? undef : $_ } qw(r p - P) ],
+    [                                qw(u q q q) ],
+    [                                qw(u r r r) ],
+    [ map { $_ eq '-' ? undef : $_ } qw(o s - -) ],
+  ]
+];
+
+push @tests, [
+  [ qw(  o p p q r s) ],
+  [ qw(n o p   q r  ) ],
+  [ qw(  o p P q r  ) ],
+  [ [ map { $_ eq '-' ? undef : $_ } qw(l - n -) ],
+    [                                qw(u o o o) ],
+    [                                qw(u p p p) ],
+    [ map { $_ eq '-' ? undef : $_ } qw(r p - P) ],
+    [                                qw(u q q q) ],
+    [                                qw(u r r r) ],
+    [ map { $_ eq '-' ? undef : $_ } qw(o s - -) ],
+  ]
+];
+
 
 $tests = scalar(@tests) + 1;
 
@@ -95,6 +136,10 @@ use Test::More tests => $tests;
 require_ok('Algorithm::Merge');
 
 my $out;
+
+{ no warnings;
+$Algorithm::Merge::DEBUG = $ENV{'DEBUG'};
+}
 
 foreach my $t (@tests) {
     if(UNIVERSAL::isa($t, 'CODE')) {

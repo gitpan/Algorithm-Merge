@@ -7,13 +7,17 @@ use Data::Dumper;
 
 use vars qw(@EXPORT_OK @ISA $VERSION $REVISION);
 
-$VERSION = '0.07';
+$VERSION = '0.08';
 
 $REVISION = (qw$Revision: 1.11 $)[-1];
 
 @EXPORT_OK = qw(diff3 merge traverse_sequences3);
 
 @ISA = qw(Exporter);
+
+sub diag {
+    main::diag(@_) if($Algorithm::Merge::DEBUG);
+}
 
 sub diff3 {
     my $pivot             = shift;                                  # array ref
@@ -237,7 +241,8 @@ sub traverse_sequences3 {
 
     my @Callback_Map = (
       [ $no_change,     A, B, C ], # 0  - no matches
-      [ $noop,                  ], # 1  -                          BC_C
+      #[ $noop,                  ], # 1  -                          BC_C
+      [ $b_diff,        A,    C ], # 1  -                          BC_C
       [ $b_diff,           B    ], #*2  -                     BC_B
       [ $noop,                  ], # 3  -                     BC_B BC_C
       [ $noop,                  ], # 4  -                AC_C
@@ -323,17 +328,17 @@ sub traverse_sequences3 {
         $callback |= $_ foreach grep { $matches[$_] } ( AB_A, AB_B, AC_A, AC_C, BC_B, BC_C );
 
         my @args = @{$Callback_Map[$callback]};
-        #main::diag(">>>>>>    We hit a noop") if @args == 1;
+        diag(">>>>>>    We hit a noop") if @args == 1;
         my $f = shift @args;
-        #main::diag(join "", "callback: $callback - \@pos: ", join(", ", @pos[A, B, C]), "\n");
-        #main::diag(">>>>>>    Callback is a no-op") unless @args;
-        #main::diag(join "", "  matches: ", join(", ", @matches[AB_A, AB_B, AC_A, AC_C, BC_B, BC_C]), "\n");
-        #main::diag(join "", " diffs: ", join(", ", map { $diffs{$_}->[0] } (AB_A, AB_B, AC_A, AC_C, BC_B, BC_C)), "\n");
-        #main::diag(join "", "args: ", join(", ", map { (qw(- C B - A))[$_] } @args), "(", join(", ", @pos[@args]), ")\n");
-        #main::diag('--------------------');
+        diag(join "", "callback: $callback - \@pos: ", join(", ", @pos[A, B, C]), "\n");
+        diag(">>>>>>    Callback is a no-op") unless @args;
+        diag(join "", "  matches: ", join(", ", map { defined($_) ? $_ : 'undef' } @matches[AB_A, AB_B, AC_A, AC_C, BC_B, BC_C]), "\n");
+        diag(join "", " diffs: ", join(", ", map { defined($_) ? $_ : 'undef' } map { $diffs{$_}->[0] } (AB_A, AB_B, AC_A, AC_C, BC_B, BC_C)), "\n");
+        diag(join "", "args: ", join(", ", map { (qw(- C B - A - - - D))[$_] } @args), "(", join(", ", map { defined($_) ? $_ : 'undef' } @pos[@args]), ")\n");
+        diag('--------------------');
         &{$f}(@pos[@args]);
         foreach (@args) {
-            $pos[$_]++;
+            $pos[$_]++ unless $_ == D;
             if($_ eq A) {
                 shift @{$diffs{&AB_A}} while @{$diffs{&AB_A}} && $diffs{&AB_A}[0] < $pos[$_];# if $matches[AB_A];
                 shift @{$diffs{&AC_A}} while @{$diffs{&AC_A}} && $diffs{&AC_A}[0] < $pos[$_];#if $matches[AC_A];
